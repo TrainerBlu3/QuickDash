@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db, nextId } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { broadcast } = require('../events');
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     createdAt: new Date().toISOString()
   };
   db.get('users').push(user).write();
+  broadcast('users');
   // Temp password is only ever returned here, at creation time, so the
   // admin can hand it to the new user. It is never retrievable again.
   res.status(201).json({ ...publicUser(user), tempPassword });
@@ -75,6 +77,7 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
   if (req.body.role === 'admin' || req.body.role === 'user') patch.role = req.body.role;
   if (req.body.name) patch.name = String(req.body.name).trim();
   db.get('users').find({ id: user.id }).assign(patch).write();
+  broadcast('users');
   res.json(publicUser(db.get('users').find({ id: user.id }).value()));
 });
 

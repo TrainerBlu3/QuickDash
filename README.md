@@ -8,6 +8,9 @@ color-coding with real status tracking and a per-user activity log.
 - **Courses yet to be done** — a live list filtered to "not started" / "in
   progress" work, with color-coded status badges (red / amber / green,
   matching the spreadsheet convention) that also carry a text label.
+- **Live updates** — the dashboard and Admin page push changes to every
+  open browser instantly (via Server-Sent Events): when one person claims
+  or finishes a course, everyone else's screen updates with no reload.
 - **Claim & update** — a user claims a course, moves it to "in progress",
   then "done." Every claim and status change is written to an activity log.
 - **Per-user activity logs** — each user sees their own history on the
@@ -46,6 +49,21 @@ the admin password (top-right menu → Change password).
 | `PORT` | HTTP port | `3000` |
 | `SESSION_SECRET` | Signs session cookies — set a real secret in production | dev placeholder |
 | `ADMIN_PASSWORD` | Password for the seeded admin account on first run | randomly generated, printed to console |
+
+## Letting other people use it
+
+This is a normal client-server app: one running instance holds the shared
+data and pushes live updates. Everyone needs to point their browser at
+that *same* instance — running separate local copies on separate machines
+gives each person an empty, unsynced database.
+
+- **Same office/Wi-Fi**: run `npm start` on one machine, everyone else
+  visits `http://<that machine's LAN IP>:3000`. No extra setup beyond
+  finding the IP and allowing the port through the firewall.
+- **Reachable from anywhere**: run it on an always-on host (a small cloud
+  VM, a spare server) behind a process manager (pm2/systemd) so it
+  survives restarts, with a real `SESSION_SECRET` and HTTPS in front of it
+  (e.g. via Caddy or nginx) since login passwords travel over the network.
 
 ## Data storage
 

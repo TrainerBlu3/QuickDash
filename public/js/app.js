@@ -112,4 +112,8 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
   await loadMe();
   await loadCourses();
   await loadLog();
+  subscribeToUpdates((scopes) => {
+    if (scopes.includes('courses')) loadCourses();
+    if (scopes.includes('activity')) loadLog();
+  });
 })();

@@ -22,3 +22,17 @@ async function api(path, opts) {
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
+
+// Live updates: the server pushes a { scopes: [...] } message whenever
+// courses, activity, or users change anywhere. Reconnects automatically
+// on drop (EventSource's built-in retry) so a network blip just resumes.
+function subscribeToUpdates(onScopes) {
+  const source = new EventSource('/api/events');
+  source.onmessage = (e) => {
+    try {
+      const { scopes } = JSON.parse(e.data);
+      onScopes(scopes || []);
+    } catch { /* ignore malformed/heartbeat messages */ }
+  };
+  return source;
+}

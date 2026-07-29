@@ -170,4 +170,9 @@ document.getElementById('log-user-filter').addEventListener('change', loadLogs);
   await loadMe();
   await loadUsers();
   await loadAdminCourses();
+  subscribeToUpdates((scopes) => {
+    if (scopes.includes('users')) loadUsers();
+    if (scopes.includes('courses')) loadAdminCourses();
+    if (scopes.includes('activity')) loadLogs();
+  });
 })();

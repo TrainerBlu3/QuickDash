@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const courseRoutes = require('./routes/courses');
 const activityRoutes = require('./routes/activity');
+const eventRoutes = require('./routes/events');
 const { requireAuth } = require('./middleware/auth');
 
 const app = express();
@@ -31,6 +32,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/events', eventRoutes);
 
 // Gate the app shell behind auth; login page and static assets stay open.
 app.get('/', requireAuth, (req, res) => {

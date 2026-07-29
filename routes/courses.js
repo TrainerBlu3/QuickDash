@@ -3,6 +3,7 @@ const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const { db, nextId } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { broadcast } = require('../events');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -64,6 +65,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     updatedAt: new Date().toISOString()
   };
   db.get('courses').push(course).write();
+  broadcast('courses');
   res.status(201).json(course);
 });
 
@@ -115,6 +117,7 @@ router.post('/import', requireAuth, requireAdmin, upload.single('file'), (req, r
     created += 1;
   }
 
+  if (created > 0) broadcast('courses');
   res.json({ created, skipped: skipped.length, totalRows: records.length });
 });
 
@@ -131,16 +134,18 @@ router.patch('/:id', requireAuth, (req, res) => {
   const isOwner = course.assignedTo === req.session.userId;
 
   if (claim === true) {
-    if (course.assignedTo && !isAdmin) {
+    if (course.assignedTo && course.assignedTo !== req.session.userId && !isAdmin) {
       return res.status(403).json({ error: 'Course is already claimed by someone else' });
     }
-    patch.assignedTo = currentUser.id;
-    patch.assignedToName = currentUser.name;
-    logActivity({
-      userId: currentUser.id, username: currentUser.name,
-      courseId: course.id, courseTitle: course.title,
-      action: 'claimed', fromStatus: course.status, toStatus: course.status
-    });
+    if (course.assignedTo !== currentUser.id) {
+      patch.assignedTo = currentUser.id;
+      patch.assignedToName = currentUser.name;
+      logActivity({
+        userId: currentUser.id, username: currentUser.name,
+        courseId: course.id, courseTitle: course.title,
+        action: 'claimed', fromStatus: course.status, toStatus: course.status
+      });
+    }
   }
 
   if (status) {
@@ -172,6 +177,7 @@ router.patch('/:id', requireAuth, (req, res) => {
   }
 
   db.get('courses').find({ id: course.id }).assign(patch).write();
+  broadcast(['courses', 'activity']);
   res.json(db.get('courses').find({ id: course.id }).value());
 });
 
@@ -179,6 +185,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
   db.get('courses').remove({ id: course.id }).write();
+  broadcast('courses');
   res.json({ ok: true });
 });
 
