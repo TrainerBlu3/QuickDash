@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickDash — Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>QuickDash — Admin</h1>
+  <div class="who">
+    <span id="who-name"></span>
+    <a href="/">Dashboard</a>
+    <button class="small" id="logout-btn">Log out</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="active" data-tab="users">Users &amp; logins</button>
+    <button data-tab="courses">Courses</button>
+    <button data-tab="logs">All activity logs</button>
+  </div>
+
+  <section id="tab-users">
+    <div class="card">
+      <h2>Create a login</h2>
+      <form id="user-form" class="inline">
+        <input type="text" id="new-username" placeholder="username" required>
+        <input type="text" id="new-name" placeholder="Full name" required>
+        <select id="new-role"><option value="user">user</option><option value="admin">admin</option></select>
+        <button type="submit" class="primary">Create user</button>
+      </form>
+      <div id="new-user-credentials"></div>
+    </div>
+    <div class="card">
+      <h2>All users</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody id="user-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-courses" style="display:none;">
+    <div class="card">
+      <h2>Import from spreadsheet (CSV)</h2>
+      <p class="muted small">Export your color-coded spreadsheet as CSV. Columns recognized: <b>title</b> (or "course"), <b>status</b> (or "color" — red/yellow/green also work), <b>category</b>.</p>
+      <form id="import-form" class="inline">
+        <input type="file" id="import-file" accept=".csv" required>
+        <button type="submit" class="primary">Import</button>
+      </form>
+      <p class="small muted" id="import-result"></p>
+    </div>
+    <div class="card">
+      <h2>Add a course</h2>
+      <form id="course-form" class="inline">
+        <input type="text" id="course-title" placeholder="Course title" required>
+        <input type="text" id="course-category" placeholder="Category (optional)">
+        <button type="submit" class="primary">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>All courses</h2>
+      <table>
+        <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr></thead>
+        <tbody id="admin-course-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-logs" style="display:none;">
+    <div class="card">
+      <div class="row spread">
+        <h2 style="margin:0;">Activity log</h2>
+        <select id="log-user-filter"><option value="">All users</option></select>
+      </div>
+      <table>
+        <thead><tr><th>When</th><th>User</th><th>Course</th><th>Action</th><th>Change</th><th>Notes</th></tr></thead>
+        <tbody id="admin-log-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script src="/js/common.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

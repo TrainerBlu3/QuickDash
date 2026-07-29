@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickDash — Dashboard</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <h1>QuickDash</h1>
+  <div class="who">
+    <span id="who-name"></span>
+    <a id="admin-link" href="/admin.html" style="display:none;">Admin</a>
+    <button class="small" id="change-pw-btn">Change password</button>
+    <button class="small" id="logout-btn">Log out</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div id="pw-warning" class="credential-box" style="display:none;">
+    You're using a temporary password. <a href="#" id="pw-warning-link">Change it now.</a>
+  </div>
+
+  <div class="stat-row" id="stat-row"></div>
+
+  <div class="card">
+    <div class="row spread">
+      <h2 style="margin:0;">Courses yet to be done</h2>
+      <label class="row small">
+        <input type="checkbox" id="show-done"> show completed too
+      </label>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Course</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr>
+      </thead>
+      <tbody id="course-rows"></tbody>
+    </table>
+    <p class="muted small" id="empty-state" style="display:none;">Nothing left to redesign 🎉</p>
+  </div>
+
+  <div class="card">
+    <h2>My activity log</h2>
+    <table>
+      <thead><tr><th>When</th><th>Course</th><th>Action</th><th>Change</th><th>Notes</th></tr></thead>
+      <tbody id="log-rows"></tbody>
+    </table>
+    <p class="muted small" id="log-empty" style="display:none;">No activity logged yet.</p>
+  </div>
+
+</div>
+
+<dialog id="pw-dialog" style="border-radius:10px;border:1px solid var(--border);padding:0;">
+  <div class="card" style="margin:0;min-width:280px;">
+    <h2>Change password</h2>
+    <form id="pw-form">
+      <div class="login-card">
+        <div class="field"><label>Current password</label><input type="password" id="pw-current" required></div>
+        <div class="field"><label>New password (min 8 chars)</label><input type="password" id="pw-new" required minlength="8"></div>
+      </div>
+      <div class="row">
+        <button type="submit" class="primary">Save</button>
+        <button type="button" id="pw-cancel">Cancel</button>
+      </div>
+      <div class="error-text" id="pw-error" style="display:none;"></div>
+    </form>
+  </div>
+</dialog>
+
+<script src="/js/common.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickDash — Log in</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="login-shell">
+  <div class="card login-card">
+    <h2 style="text-transform:none;letter-spacing:normal;color:var(--text-primary);font-size:20px;">QuickDash</h2>
+    <p class="muted small">Course redesign tracker. Sign in with the login your admin gave you.</p>
+    <form id="login-form">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="primary" style="width:100%;">Log in</button>
+      <div class="error-text" id="error" style="display:none;"></div>
+    </form>
+  </div>
+</div>
+<script src="/js/login.js"></script>
+</body>
+</html>
