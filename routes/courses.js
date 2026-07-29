@@ -94,12 +94,23 @@ router.post('/import', requireAuth, requireAdmin, upload.single('file'), (req, r
     return '';
   };
 
+  // Match existing courses by title (case-insensitive) so re-importing an
+  // updated export only adds new rows — it never touches a course that's
+  // already been claimed or is in progress.
+  const existingTitles = new Set(db.get('courses').map(c => c.title.trim().toLowerCase()).value());
+
   let created = 0;
+  let duplicates = 0;
   const skipped = [];
   for (const row of records) {
     const title = findValue(row, titleKey);
     if (!title || !title.trim()) {
       skipped.push(row);
+      continue;
+    }
+    const key = title.trim().toLowerCase();
+    if (existingTitles.has(key)) {
+      duplicates += 1;
       continue;
     }
     const course = {
@@ -114,11 +125,12 @@ router.post('/import', requireAuth, requireAdmin, upload.single('file'), (req, r
       updatedAt: new Date().toISOString()
     };
     db.get('courses').push(course).write();
+    existingTitles.add(key);
     created += 1;
   }
 
   if (created > 0) broadcast('courses');
-  res.json({ created, skipped: skipped.length, totalRows: records.length });
+  res.json({ created, duplicates, skipped: skipped.length, totalRows: records.length });
 });
 
 router.patch('/:id', requireAuth, (req, res) => {

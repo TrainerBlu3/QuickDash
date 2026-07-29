@@ -140,7 +140,10 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
   if (!res.ok) {
     resultEl.textContent = data.error || 'Import failed';
   } else {
-    resultEl.textContent = `Imported ${data.created} of ${data.totalRows} rows${data.skipped ? ` (${data.skipped} skipped — missing title)` : ''}.`;
+    const notes = [];
+    if (data.duplicates) notes.push(`${data.duplicates} already existed, left untouched`);
+    if (data.skipped) notes.push(`${data.skipped} skipped — missing title`);
+    resultEl.textContent = `Added ${data.created} new course${data.created === 1 ? '' : 's'} of ${data.totalRows} rows${notes.length ? ` (${notes.join('; ')})` : ''}.`;
     fileInput.value = '';
     await loadAdminCourses();
   }
