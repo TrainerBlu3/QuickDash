@@ -1,12 +1,45 @@
 const express = require('express');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
+const { readSheet } = require('read-excel-file/node');
 const { db, nextId } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { broadcast } = require('../events');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(csv|xlsx|xls)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only .csv, .xlsx, or .xls files are supported'), ok);
+  }
+});
+
+// Both formats end up as an array of row objects keyed by lowercased,
+// trimmed header text — the same shape the rest of the import logic expects.
+async function parseSpreadsheet(buffer, originalName) {
+  if (/\.xlsx?$/i.test(originalName || '')) {
+    const rows = await readSheet(buffer); // first sheet only, regardless of how many the workbook has
+    if (!rows.length) return [];
+    const [headerRow, ...dataRows] = rows;
+    const headers = headerRow.map(h => String(h ?? '').trim().toLowerCase());
+    return dataRows.map(row => {
+      const record = {};
+      headers.forEach((header, i) => {
+        if (!header) return;
+        const value = row[i];
+        record[header] = value == null ? '' : String(value).trim();
+      });
+      return record;
+    });
+  }
+  return parse(buffer.toString('utf8'), {
+    columns: header => header.map(h => h.trim().toLowerCase()),
+    skip_empty_lines: true,
+    trim: true
+  });
+}
 
 const STATUSES = ['not_started', 'in_progress', 'done'];
 
@@ -69,20 +102,23 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   res.status(201).json(course);
 });
 
-router.post('/import', requireAuth, requireAdmin, upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'CSV file is required (field name "file")' });
+router.post('/import', requireAuth, requireAdmin, (req, res) => {
+  upload.single('file')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'A CSV or Excel file is required (field name "file")' });
 
-  let records;
-  try {
-    records = parse(req.file.buffer.toString('utf8'), {
-      columns: header => header.map(h => h.trim().toLowerCase()),
-      skip_empty_lines: true,
-      trim: true
-    });
-  } catch (err) {
-    return res.status(400).json({ error: `Could not parse CSV: ${err.message}` });
-  }
+    let records;
+    try {
+      records = await parseSpreadsheet(req.file.buffer, req.file.originalname);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not parse file: ${err.message}` });
+    }
 
+    importRecords(records, res);
+  });
+});
+
+function importRecords(records, res) {
   const titleKey = ['title', 'course', 'course name', 'course title', 'name'];
   const statusKey = ['status', 'color', 'colour'];
   const categoryKey = ['category', 'department', 'subject'];
@@ -131,7 +167,7 @@ router.post('/import', requireAuth, requireAdmin, upload.single('file'), (req, r
 
   if (created > 0) broadcast('courses');
   res.json({ created, duplicates, skipped: skipped.length, totalRows: records.length });
-});
+}
 
 router.patch('/:id', requireAuth, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();

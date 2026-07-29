@@ -45,10 +45,10 @@
 
   <section id="tab-courses" style="display:none;">
     <div class="card">
-      <h2>Import from spreadsheet (CSV)</h2>
-      <p class="muted small">Export your color-coded spreadsheet as CSV and drop it in. Columns recognized: <b>title</b> (or "course"), <b>status</b> (or "color" — red/yellow/green also work), <b>category</b>. Safe to re-import later with an updated export — courses already in QuickDash (matched by title) are left untouched, only new rows get added.</p>
+      <h2>Import from spreadsheet</h2>
+      <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>status</b> (or "color" — red/yellow/green also work), <b>category</b>. Safe to re-import later with an updated export — courses already in QuickDash (matched by title) are left untouched, only new rows get added.</p>
       <form id="import-form" class="inline">
-        <input type="file" id="import-file" accept=".csv" required>
+        <input type="file" id="import-file" accept=".csv,.xlsx,.xls" required>
         <button type="submit" class="primary">Import</button>
       </form>
       <p class="small muted" id="import-result"></p>

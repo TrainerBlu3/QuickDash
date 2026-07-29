@@ -18,9 +18,11 @@ color-coding with real status tracking and a per-user activity log.
 - **Login accounts** — admins create a login for each person from the Admin
   page. A temporary password is generated and shown once, for the admin to
   hand off; the user sets their own password on first login.
-- **CSV import** — export the existing spreadsheet to CSV and import it.
-  Columns `title`/`course`, `status`/`color` (accepts red/yellow/green as
-  well as not started/in progress/done), and `category` are recognized.
+- **Spreadsheet import** — drop in `.xlsx`, `.xls`, or `.csv` directly, no
+  need to save as CSV first. Columns `title`/`course`, `status`/`color`
+  (accepts red/yellow/green as well as not started/in progress/done), and
+  `category` are recognized. Safe to re-run with an updated export — only
+  new rows (matched by title) get added; existing courses are left alone.
 
 ## Getting started
 
