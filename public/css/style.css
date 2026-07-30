@@ -114,6 +114,9 @@ a { color: var(--accent); }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--gridline); }
 th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]:hover { color: var(--text-primary); }
+.sort-arrow { display: inline-block; width: 10px; margin-left: 2px; }
 tbody tr:hover { background: var(--page-plane); }
 
 .badge {

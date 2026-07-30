@@ -1,6 +1,7 @@
 let me = null;
 let programColors = {};
 let allUsers = [];
+const columnSort = createColumnSort(() => loadCourses());
 
 async function loadProgramColors() {
   programColors = await api('/api/program-colors');
@@ -61,10 +62,7 @@ async function loadCourses() {
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
   else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
   if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
-  courses = courses.sort((a, b) =>
-    (b.priority === true) - (a.priority === true) ||
-    Boolean(b.crn) - Boolean(a.crn) ||
-    a.title.localeCompare(b.title));
+  courses = columnSort.sortCourses(courses);
 
   loadStats(allCourses);
 

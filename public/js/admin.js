@@ -1,5 +1,6 @@
 let users = [];
 let programColors = {};
+const columnSort = createColumnSort(() => loadAdminCourses());
 
 // Named theme presets for the brand-color picker (quick-pick swatches).
 // Each swatch uses the theme's "circle" value — the color the theme design
@@ -148,10 +149,7 @@ async function loadAdminCourses() {
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
   else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
   if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
-  courses = courses.sort((a, b) =>
-    (b.priority === true) - (a.priority === true) ||
-    Boolean(b.crn) - Boolean(a.crn) ||
-    a.title.localeCompare(b.title));
+  courses = columnSort.sortCourses(courses);
 
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
