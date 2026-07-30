@@ -95,21 +95,31 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 // ---- Courses ----
 
 async function loadAdminCourses() {
-  const courses = await api('/api/courses');
+  const courses = (await api('/api/courses')).sort((a, b) => (b.priority === true) - (a.priority === true));
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
     <tr>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.category || '—')}</td>
-      <td>${badge(c.status)}</td>
+      <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
-      <td><button class="small" data-id="${c.id}" data-action="delete">Delete</button></td>
+      <td>
+        <button class="small" data-id="${c.id}" data-action="toggle-priority">${c.priority ? 'Unmark priority' : 'Mark priority'}</button>
+        <button class="small" data-id="${c.id}" data-action="delete">Delete</button>
+      </td>
     </tr>
   `).join('');
   tbody.querySelectorAll('button[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this course? This does not delete its activity history.')) return;
       await api(`/api/courses/${btn.dataset.id}`, { method: 'DELETE' });
+      await loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('button[data-action="toggle-priority"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const course = courses.find(c => c.id === Number(btn.dataset.id));
+      await api(`/api/courses/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ priority: !course.priority }) });
       await loadAdminCourses();
     });
   });
@@ -143,6 +153,7 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
     const notes = [];
     if (data.duplicates) notes.push(`${data.duplicates} already existed, left untouched`);
     if (data.skipped) notes.push(`${data.skipped} skipped — missing title`);
+    if (data.colorDetected) notes.push(`from cell colors: ${data.colorDetected.done} marked done, ${data.colorDetected.priority} marked priority`);
     resultEl.textContent = `Added ${data.created} new course${data.created === 1 ? '' : 's'} of ${data.totalRows} rows${notes.length ? ` (${notes.join('; ')})` : ''}.`;
     fileInput.value = '';
     await loadAdminCourses();

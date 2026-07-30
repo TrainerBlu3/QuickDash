@@ -14,6 +14,8 @@
   --status-good-bg:     #e4f6e4;
   --status-warning-bg:  #fdf1d8;
   --status-critical-bg: #fbe4e4;
+  --priority:    #4a3aa7;
+  --priority-bg: #eae7fa;
   --accent: #2a78d6;
   --accent-ink: #ffffff;
 }
@@ -35,6 +37,8 @@
     --status-good-bg:     #12301a;
     --status-warning-bg:  #3a2c0d;
     --status-critical-bg: #3a1414;
+    --priority:    #9085e9;
+    --priority-bg: #2c2650;
     --accent: #3987e5;
     --accent-ink: #0b0b0b;
   }
@@ -55,6 +59,8 @@
   --status-good-bg:     #12301a;
   --status-warning-bg:  #3a2c0d;
   --status-critical-bg: #3a1414;
+  --priority:    #9085e9;
+  --priority-bg: #2c2650;
   --accent: #3987e5;
   --accent-ink: #0b0b0b;
 }
@@ -127,6 +133,7 @@ tbody tr:hover { background: var(--page-plane); }
 .badge.in_progress .dot { background: var(--status-warning); }
 .badge.done { background: var(--status-good-bg); color: var(--status-good); }
 .badge.done .dot { background: var(--status-good); }
+.badge.priority { background: var(--priority-bg); color: var(--priority); }
 
 button, .btn {
   font-family: inherit;

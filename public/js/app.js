@@ -26,7 +26,8 @@ async function loadStats(courses) {
 async function loadCourses() {
   const showDone = document.getElementById('show-done').checked;
   const allCourses = await api('/api/courses');
-  const courses = showDone ? allCourses : allCourses.filter(c => c.status !== 'done');
+  const courses = (showDone ? allCourses : allCourses.filter(c => c.status !== 'done'))
+    .sort((a, b) => (b.priority === true) - (a.priority === true));
   loadStats(allCourses);
 
   const tbody = document.getElementById('course-rows');
@@ -42,7 +43,7 @@ async function loadCourses() {
     return `<tr>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.category || '—')}</td>
-      <td>${badge(c.status)}</td>
+      <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
       <td>${actions}</td>
     </tr>`;

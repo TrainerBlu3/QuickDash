@@ -4,6 +4,10 @@ function badge(status) {
   return `<span class="badge ${status}"><span class="dot"></span>${STATUS_LABEL[status] || status}</span>`;
 }
 
+function priorityBadge() {
+  return `<span class="badge priority" title="Marked higher priority">★ Priority</span>`;
+}
+
 function fmtTime(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }

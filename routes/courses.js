@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
-const { readSheet } = require('read-excel-file/node');
+const XlsxPopulate = require('xlsx-populate');
+const { loadThemeColors, classifyRow } = require('../colorClassify');
 const { db, nextId } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { broadcast } = require('../events');
@@ -16,29 +17,45 @@ const upload = multer({
   }
 });
 
-// Both formats end up as an array of row objects keyed by lowercased,
-// trimmed header text — the same shape the rest of the import logic expects.
+// CSV rows carry no color info; xlsx rows do — each row's `color` is the
+// classification of whatever fill fires first when scanning across its
+// cells (see colorClassify.js), or null for CSV.
 async function parseSpreadsheet(buffer, originalName) {
   if (/\.xlsx?$/i.test(originalName || '')) {
-    const rows = await readSheet(buffer); // first sheet only, regardless of how many the workbook has
-    if (!rows.length) return [];
-    const [headerRow, ...dataRows] = rows;
-    const headers = headerRow.map(h => String(h ?? '').trim().toLowerCase());
-    return dataRows.map(row => {
-      const record = {};
+    const [workbook, themeColors] = await Promise.all([
+      XlsxPopulate.fromDataAsync(buffer),
+      loadThemeColors(buffer)
+    ]);
+    const sheet = workbook.sheet(0);
+    const usedRange = sheet.usedRange();
+    if (!usedRange) return [];
+    const startRow = usedRange.startCell().rowNumber();
+    const startColumn = usedRange.startCell().columnNumber();
+    const endRow = usedRange.endCell().rowNumber();
+    const endColumn = usedRange.endCell().columnNumber();
+    const headers = [];
+    for (let col = startColumn; col <= endColumn; col++) {
+      headers.push(String(sheet.cell(startRow, col).value() ?? '').trim().toLowerCase());
+    }
+    const rows = [];
+    for (let row = startRow + 1; row <= endRow; row++) {
+      const fields = {};
       headers.forEach((header, i) => {
         if (!header) return;
-        const value = row[i];
-        record[header] = value == null ? '' : String(value).trim();
+        const value = sheet.cell(row, startColumn + i).value();
+        fields[header] = value == null ? '' : String(value).trim();
       });
-      return record;
-    });
+      const color = classifyRow(sheet, row, endColumn, themeColors);
+      rows.push({ fields, color });
+    }
+    return rows;
   }
-  return parse(buffer.toString('utf8'), {
+  const records = parse(buffer.toString('utf8'), {
     columns: header => header.map(h => h.trim().toLowerCase()),
     skip_empty_lines: true,
     trim: true
   });
+  return records.map(fields => ({ fields, color: null }));
 }
 
 const STATUSES = ['not_started', 'in_progress', 'done'];
@@ -91,6 +108,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     title: String(title).trim(),
     category: category ? String(category).trim() : '',
     status: 'not_started',
+    priority: false,
     assignedTo: null,
     assignedToName: null,
     notes: notes || '',
@@ -107,53 +125,81 @@ router.post('/import', requireAuth, requireAdmin, (req, res) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
     if (!req.file) return res.status(400).json({ error: 'A CSV or Excel file is required (field name "file")' });
 
-    let records;
+    let rows;
     try {
-      records = await parseSpreadsheet(req.file.buffer, req.file.originalname);
+      rows = await parseSpreadsheet(req.file.buffer, req.file.originalname);
     } catch (err) {
       return res.status(400).json({ error: `Could not parse file: ${err.message}` });
     }
 
-    importRecords(records, res);
+    importRecords(rows, res);
   });
 });
 
-function importRecords(records, res) {
-  const titleKey = ['title', 'course', 'course name', 'course title', 'name'];
-  const statusKey = ['status', 'color', 'colour'];
-  const categoryKey = ['category', 'department', 'subject'];
+const TITLE_KEY = ['title', 'course', 'course name', 'course title', 'name'];
+const STATUS_KEY = ['status', 'color', 'colour'];
+const CATEGORY_KEY = ['category', 'department', 'subject', 'program'];
+const INSTRUCTOR_KEY = ['instructor', 'faculty', 'teacher'];
 
-  const findValue = (row, candidates) => {
-    for (const key of Object.keys(row)) {
-      if (candidates.includes(key)) return row[key];
-    }
-    return '';
-  };
+function findValue(fields, candidates) {
+  for (const key of Object.keys(fields)) {
+    if (candidates.includes(key)) return fields[key];
+  }
+  return '';
+}
 
+function importRecords(rows, res) {
   // Match existing courses by title (case-insensitive) so re-importing an
   // updated export only adds new rows — it never touches a course that's
-  // already been claimed or is in progress.
+  // already been claimed or is in progress. When an instructor column is
+  // present, it's folded into the title (e.g. "EA 111 — Tanya Fleck") so
+  // that a course code repeated across multiple sections is tracked as
+  // separate rows instead of being collapsed into one.
   const existingTitles = new Set(db.get('courses').map(c => c.title.trim().toLowerCase()).value());
 
   let created = 0;
   let duplicates = 0;
-  const skipped = [];
-  for (const row of records) {
-    const title = findValue(row, titleKey);
-    if (!title || !title.trim()) {
-      skipped.push(row);
+  let skipped = 0;
+  let colorDone = 0;
+  let colorPriority = 0;
+  for (const row of rows) {
+    const { fields, color } = row;
+    const baseTitle = findValue(fields, TITLE_KEY);
+    if (!baseTitle || !baseTitle.trim()) {
+      skipped += 1;
       continue;
     }
-    const key = title.trim().toLowerCase();
+    const instructor = findValue(fields, INSTRUCTOR_KEY);
+    const title = instructor && instructor.trim()
+      ? `${baseTitle.trim()} — ${instructor.trim()}`
+      : baseTitle.trim();
+
+    const key = title.toLowerCase();
     if (existingTitles.has(key)) {
       duplicates += 1;
       continue;
     }
+
+    const explicitStatus = findValue(fields, STATUS_KEY);
+    let status = 'not_started';
+    let priority = false;
+    if (explicitStatus && explicitStatus.trim()) {
+      status = normalizeStatus(explicitStatus);
+    } else if (color) {
+      status = color.done ? 'done' : 'not_started';
+      priority = color.priority;
+    }
+    if (color) {
+      if (color.done) colorDone += 1;
+      if (color.priority) colorPriority += 1;
+    }
+
     const course = {
       id: nextId('course'),
-      title: title.trim(),
-      category: (findValue(row, categoryKey) || '').trim(),
-      status: normalizeStatus(findValue(row, statusKey)),
+      title,
+      category: (findValue(fields, CATEGORY_KEY) || '').trim(),
+      status,
+      priority,
       assignedTo: null,
       assignedToName: null,
       notes: '',
@@ -166,20 +212,31 @@ function importRecords(records, res) {
   }
 
   if (created > 0) broadcast('courses');
-  res.json({ created, duplicates, skipped: skipped.length, totalRows: records.length });
+  res.json({
+    created,
+    duplicates,
+    skipped,
+    totalRows: rows.length,
+    colorDetected: rows.some(r => r.color) ? { done: colorDone, priority: colorPriority } : null
+  });
 }
 
 router.patch('/:id', requireAuth, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
-  const { status, claim, notes } = req.body || {};
+  const { status, claim, notes, priority } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
   // Non-admins may only touch courses assigned to them (or claim an unassigned one).
   const isAdmin = req.session.role === 'admin';
   const isOwner = course.assignedTo === req.session.userId;
+
+  if (typeof priority === 'boolean') {
+    if (!isAdmin) return res.status(403).json({ error: 'Only admins can change priority' });
+    patch.priority = priority;
+  }
 
   if (claim === true) {
     if (course.assignedTo && course.assignedTo !== req.session.userId && !isAdmin) {
