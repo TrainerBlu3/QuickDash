@@ -23,8 +23,10 @@ color-coding with real status tracking and a per-user activity log.
   `crn`/`section`, and `instructor` (folded into the title, e.g. "EA 111 —
   Tanya Fleck", so a course code repeated across sections tracks as separate
   rows instead of collapsing into one) are recognized. Safe to re-run with
-  an updated export — only new rows (matched by title) get added; existing
-  courses are left alone.
+  an updated export — a row matched by title to a course that already
+  exists never has its status, priority, assignment, or notes touched (so a
+  claim or in-progress mark always survives), though its category/CRN do
+  get backfilled if the import has a non-blank value for them.
 - **CRN** — courses with a CRN (an actively scheduled section, as opposed
   to a placeholder) sort above ones without, right under anything marked
   priority.
@@ -34,7 +36,7 @@ color-coding with real status tracking and a per-user activity log.
   sheet has one). Handles Excel's theme-color + tint shading, not just
   plain RGB fills, and per-row color doesn't have to span every column.
 - **Program brand colors** — admins can assign a color to a category/program
-  (e.g. all "EA" courses) from the Admin → Courses tab; it shows as a small
+  (e.g. all "EA" courses) from the Admin → Brand colors tab; it shows as a small
   swatch next to the category everywhere. This is separate from the
   done/priority status coloring above — it's just a visual label.
 - **Admin overrides** — admins can set any course's status directly

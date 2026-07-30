@@ -314,7 +314,11 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
     resultEl.textContent = data.error || 'Import failed';
   } else {
     const notes = [];
-    if (data.duplicates) notes.push(`${data.duplicates} already existed, left untouched`);
+    if (data.duplicates) {
+      notes.push(data.updated
+        ? `${data.duplicates} already existed (${data.updated} had their category/CRN updated)`
+        : `${data.duplicates} already existed, left untouched`);
+    }
     if (data.skipped) notes.push(`${data.skipped} skipped — missing title`);
     if (data.colorDetected) notes.push(`from cell colors: ${data.colorDetected.done} marked done, ${data.colorDetected.priority} marked priority`);
     resultEl.textContent = `Added ${data.created} new course${data.created === 1 ? '' : 's'} of ${data.totalRows} rows${notes.length ? ` (${notes.join('; ')})` : ''}.`;

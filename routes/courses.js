@@ -152,15 +152,20 @@ function findValue(fields, candidates) {
 
 function importRecords(rows, res) {
   // Match existing courses by title (case-insensitive) so re-importing an
-  // updated export only adds new rows — it never touches a course that's
-  // already been claimed or is in progress. When an instructor column is
-  // present, it's folded into the title (e.g. "EA 111 — Tanya Fleck") so
-  // that a course code repeated across multiple sections is tracked as
-  // separate rows instead of being collapsed into one.
-  const existingTitles = new Set(db.get('courses').map(c => c.title.trim().toLowerCase()).value());
+  // updated export only adds new rows and never touches a course's status,
+  // priority, assignment, or notes — a claim or in-progress mark always
+  // survives a re-import. Category/CRN are the exception: those get
+  // backfilled onto an already-existing row if the import has a non-blank
+  // value for them, since spreadsheets are commonly re-exported with
+  // columns (like CRN) that an earlier import round didn't have yet. When
+  // an instructor column is present, it's folded into the title (e.g.
+  // "EA 111 — Tanya Fleck") so that a course code repeated across multiple
+  // sections is tracked as separate rows instead of being collapsed into one.
+  const existingByTitle = new Map(db.get('courses').value().map(c => [c.title.trim().toLowerCase(), c]));
 
   let created = 0;
   let duplicates = 0;
+  let updated = 0;
   let skipped = 0;
   let colorDone = 0;
   let colorPriority = 0;
@@ -177,8 +182,20 @@ function importRecords(rows, res) {
       : baseTitle.trim();
 
     const key = title.toLowerCase();
-    if (existingTitles.has(key)) {
+    const existing = existingByTitle.get(key);
+    if (existing) {
       duplicates += 1;
+      const category = (findValue(fields, CATEGORY_KEY) || '').trim();
+      const crn = (findValue(fields, CRN_KEY) || '').trim();
+      const patch = {};
+      if (category && category !== existing.category) patch.category = category;
+      if (crn && crn !== existing.crn) patch.crn = crn;
+      if (Object.keys(patch).length) {
+        patch.updatedAt = new Date().toISOString();
+        db.get('courses').find({ id: existing.id }).assign(patch).write();
+        Object.assign(existing, patch);
+        updated += 1;
+      }
       continue;
     }
 
@@ -210,14 +227,15 @@ function importRecords(rows, res) {
       updatedAt: new Date().toISOString()
     };
     db.get('courses').push(course).write();
-    existingTitles.add(key);
+    existingByTitle.set(key, course);
     created += 1;
   }
 
-  if (created > 0) broadcast('courses');
+  if (created > 0 || updated > 0) broadcast('courses');
   res.json({
     created,
     duplicates,
+    updated,
     skipped,
     totalRows: rows.length,
     colorDetected: rows.some(r => r.color) ? { done: colorDone, priority: colorPriority } : null
