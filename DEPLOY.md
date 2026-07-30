@@ -114,11 +114,31 @@ admin password from the Admin page.
 
 ## Updating after future code changes
 
+**Manually:**
+
 ```bash
 sudo -u quickdash git -C /opt/quickdash pull
 sudo -u quickdash npm ci --omit=dev --prefix /opt/quickdash
 sudo systemctl restart quickdash
 ```
+
+**Automatically:** `setup.sh` also installs (but doesn't enable) a systemd
+timer that checks for new commits every few minutes and deploys them —
+pulls, reinstalls dependencies only if `package-lock.json` changed, and
+restarts the service, all as the unprivileged `quickdash` user except the
+restart itself. No GitHub-side credentials or webhook needed since it
+polls from the VM using the repo access it already has.
+
+```bash
+sudo systemctl enable --now quickdash-autoupdate.timer
+sudo systemctl list-timers quickdash-autoupdate.timer   # confirm it's scheduled
+sudo journalctl -u quickdash-autoupdate -n 20 --no-pager  # see recent update runs
+```
+
+To change how often it checks, edit `OnUnitActiveSec=` in
+`/etc/systemd/system/quickdash-autoupdate.timer`, then
+`sudo systemctl daemon-reload && sudo systemctl restart quickdash-autoupdate.timer`.
+To stop auto-updating: `sudo systemctl disable --now quickdash-autoupdate.timer`.
 
 ## Backups
 

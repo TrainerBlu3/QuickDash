@@ -1,0 +1,8 @@
+[Unit]
+Description=Check for QuickDash updates and deploy them
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/quickdash/deploy/auto-update.sh

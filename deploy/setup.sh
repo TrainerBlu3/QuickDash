@@ -60,8 +60,11 @@ if [ ! -f "$APP_DIR/.env" ]; then
   chmod 600 "$APP_DIR/.env"
 fi
 
-# --- systemd unit (installed, not started yet) ---
+# --- systemd units (installed, not started yet) ---
 cp "$APP_DIR/deploy/quickdash.service" /etc/systemd/system/quickdash.service
+chmod +x "$APP_DIR/deploy/auto-update.sh"
+cp "$APP_DIR/deploy/quickdash-autoupdate.service" /etc/systemd/system/quickdash-autoupdate.service
+cp "$APP_DIR/deploy/quickdash-autoupdate.timer" /etc/systemd/system/quickdash-autoupdate.timer
 systemctl daemon-reload
 
 cat <<EOF
@@ -82,4 +85,10 @@ Setup done. Before starting the service:
 
 4. If you didn't set ADMIN_PASSWORD, grab the generated one from the log:
      sudo journalctl -u quickdash -n 50 --no-pager | grep -A2 password
+
+5. (optional) Auto-deploy new pushes — checks every few minutes and pulls,
+   reinstalls dependencies if needed, and restarts only when there's a new
+   commit:
+     sudo systemctl enable --now quickdash-autoupdate.timer
+     sudo systemctl list-timers quickdash-autoupdate.timer
 EOF
