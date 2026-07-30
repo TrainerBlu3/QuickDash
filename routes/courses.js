@@ -150,6 +150,18 @@ function findValue(fields, candidates) {
   return '';
 }
 
+// CRN column headers vary a lot in the wild ("CRN to be used", "CRN#",
+// "Fall CRN", ...) — matching on a "crn" prefix instead of the exact
+// header text catches those without needing every phrasing listed.
+function findCrnValue(fields) {
+  const exact = findValue(fields, CRN_KEY);
+  if (exact) return exact;
+  for (const key of Object.keys(fields)) {
+    if (key.startsWith('crn')) return fields[key];
+  }
+  return '';
+}
+
 function importRecords(rows, res) {
   // Match existing courses by title (case-insensitive) so re-importing an
   // updated export only adds new rows and never touches a course's status,
@@ -186,7 +198,7 @@ function importRecords(rows, res) {
     if (existing) {
       duplicates += 1;
       const category = (findValue(fields, CATEGORY_KEY) || '').trim();
-      const crn = (findValue(fields, CRN_KEY) || '').trim();
+      const crn = (findCrnValue(fields) || '').trim();
       const patch = {};
       if (category && category !== existing.category) patch.category = category;
       if (crn && crn !== existing.crn) patch.crn = crn;
@@ -217,7 +229,7 @@ function importRecords(rows, res) {
       id: nextId('course'),
       title,
       category: (findValue(fields, CATEGORY_KEY) || '').trim(),
-      crn: (findValue(fields, CRN_KEY) || '').trim(),
+      crn: (findCrnValue(fields) || '').trim(),
       status,
       priority,
       assignedTo: null,
