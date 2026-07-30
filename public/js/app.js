@@ -40,6 +40,7 @@ async function loadCourses() {
     if (canClaim) actions += `<button class="small" data-action="claim" data-id="${c.id}">Claim</button> `;
     if (canAdvance && c.status === 'not_started') actions += `<button class="small primary" data-action="start" data-id="${c.id}">Start</button> `;
     if (canAdvance && c.status === 'in_progress') actions += `<button class="small primary" data-action="finish" data-id="${c.id}">Mark done</button> `;
+    if (isMine && c.status !== 'done') actions += `<button class="small" data-action="unclaim" data-id="${c.id}">Give back</button> `;
     return `<tr>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.category || '—')}</td>
@@ -59,6 +60,7 @@ async function handleCourseAction(action, id) {
     if (action === 'claim') await api(`/api/courses/${id}`, { method: 'PATCH', body: JSON.stringify({ claim: true }) });
     if (action === 'start') await api(`/api/courses/${id}`, { method: 'PATCH', body: JSON.stringify({ claim: true, status: 'in_progress' }) });
     if (action === 'finish') await api(`/api/courses/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) });
+    if (action === 'unclaim') await api(`/api/courses/${id}`, { method: 'PATCH', body: JSON.stringify({ unclaim: true }) });
     await loadCourses();
     await loadLog();
   } catch (err) {

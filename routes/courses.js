@@ -225,7 +225,7 @@ router.patch('/:id', requireAuth, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
-  const { status, claim, notes, priority } = req.body || {};
+  const { status, claim, unclaim, notes, priority } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
@@ -236,6 +236,23 @@ router.patch('/:id', requireAuth, (req, res) => {
   if (typeof priority === 'boolean') {
     if (!isAdmin) return res.status(403).json({ error: 'Only admins can change priority' });
     patch.priority = priority;
+  }
+
+  if (unclaim === true) {
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ error: 'Only the assignee or an admin can release this claim' });
+    }
+    if (course.assignedTo) {
+      const previousName = course.assignedToName;
+      patch.assignedTo = null;
+      patch.assignedToName = null;
+      logActivity({
+        userId: currentUser.id, username: currentUser.name,
+        courseId: course.id, courseTitle: course.title,
+        action: 'unclaimed', fromStatus: course.status, toStatus: course.status,
+        notes: isAdmin && !isOwner ? `Released by admin (was claimed by ${previousName})` : notes
+      });
+    }
   }
 
   if (claim === true) {

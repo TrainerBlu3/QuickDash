@@ -101,10 +101,16 @@ async function loadAdminCourses() {
     <tr>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.category || '—')}</td>
-      <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
+      <td>
+        <select data-id="${c.id}" data-action="set-status">
+          ${['not_started', 'in_progress', 'done'].map(s => `<option value="${s}" ${s === c.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
+        </select>
+        ${c.priority ? ' ' + priorityBadge() : ''}
+      </td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
       <td>
         <button class="small" data-id="${c.id}" data-action="toggle-priority">${c.priority ? 'Unmark priority' : 'Mark priority'}</button>
+        ${c.assignedToName ? `<button class="small" data-id="${c.id}" data-action="unclaim">Unclaim</button>` : ''}
         <button class="small" data-id="${c.id}" data-action="delete">Delete</button>
       </td>
     </tr>
@@ -120,6 +126,20 @@ async function loadAdminCourses() {
     btn.addEventListener('click', async () => {
       const course = courses.find(c => c.id === Number(btn.dataset.id));
       await api(`/api/courses/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ priority: !course.priority }) });
+      await loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('button[data-action="unclaim"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const course = courses.find(c => c.id === Number(btn.dataset.id));
+      if (!confirm(`Release ${escapeHtml(course.assignedToName)}'s claim on "${course.title}"?`)) return;
+      await api(`/api/courses/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ unclaim: true }) });
+      await loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('select[data-action="set-status"]').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      await api(`/api/courses/${sel.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: sel.value }) });
       await loadAdminCourses();
     });
   });
