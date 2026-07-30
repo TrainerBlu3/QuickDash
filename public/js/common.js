@@ -23,6 +23,29 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Dark mode: style.css already keys its colors off a `data-theme` attribute
+// on <html>, falling back to the OS preference when unset. This just adds
+// an explicit override, persisted in localStorage.
+function currentTheme() {
+  const explicit = document.documentElement.getAttribute('data-theme');
+  if (explicit) return explicit;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function initThemeToggle() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const updateIcon = () => { btn.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; };
+  updateIcon();
+  btn.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('quickdash-theme', next);
+    updateIcon();
+  });
+}
+initThemeToggle();
+
 async function api(path, opts) {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },

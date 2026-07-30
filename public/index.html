@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QuickDash — Dashboard</title>
 <link rel="stylesheet" href="/css/style.css">
+<script>
+(function () {
+  var t = localStorage.getItem('quickdash-theme');
+  if (t) document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 </head>
 <body>
 <div class="topbar">
@@ -12,6 +18,7 @@
   <div class="who">
     <span id="who-name"></span>
     <a id="admin-link" href="/admin.html" style="display:none;">Admin</a>
+    <button class="small" id="theme-toggle" title="Toggle dark mode"></button>
     <button class="small" id="change-pw-btn">Change password</button>
     <button class="small" id="logout-btn">Log out</button>
   </div>

@@ -61,7 +61,7 @@ async function loadCourses() {
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
   else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
   if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
-  courses = courses.sort((a, b) => a.title.localeCompare(b.title));
+  courses = courses.sort((a, b) => (b.priority === true) - (a.priority === true) || a.title.localeCompare(b.title));
 
   loadStats(allCourses);
 
