@@ -1,8 +1,29 @@
 let me = null;
 let programColors = {};
+let allUsers = [];
 
 async function loadProgramColors() {
   programColors = await api('/api/program-colors');
+}
+
+async function loadUsersList() {
+  allUsers = await api('/api/users/list');
+  const select = document.getElementById('filter-user');
+  const current = select.value;
+  select.innerHTML = '<option value="">All users</option><option value="unassigned">Unassigned</option>'
+    + allUsers.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+  select.value = current;
+}
+
+// Rebuilds the category filter's options from whatever categories are
+// actually present, preserving the current selection if it still exists.
+function refreshCategoryFilter(courses) {
+  const select = document.getElementById('filter-category');
+  const current = select.value;
+  const categories = [...new Set(courses.map(c => c.category).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All categories</option>'
+    + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  select.value = current;
 }
 
 async function loadMe() {
@@ -30,9 +51,18 @@ async function loadStats(courses) {
 
 async function loadCourses() {
   const showDone = document.getElementById('show-done').checked;
+  const userFilter = document.getElementById('filter-user').value;
+  const categoryFilter = document.getElementById('filter-category').value;
+
   const allCourses = await api('/api/courses');
-  const courses = (showDone ? allCourses : allCourses.filter(c => c.status !== 'done'))
-    .sort((a, b) => (b.priority === true) - (a.priority === true));
+  refreshCategoryFilter(allCourses);
+
+  let courses = showDone ? allCourses : allCourses.filter(c => c.status !== 'done');
+  if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
+  else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
+  if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
+  courses = courses.sort((a, b) => a.title.localeCompare(b.title));
+
   loadStats(allCourses);
 
   const tbody = document.getElementById('course-rows');
@@ -89,6 +119,8 @@ async function loadLog() {
 }
 
 document.getElementById('show-done').addEventListener('change', loadCourses);
+document.getElementById('filter-user').addEventListener('change', loadCourses);
+document.getElementById('filter-category').addEventListener('change', loadCourses);
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await api('/api/auth/logout', { method: 'POST' });
@@ -119,11 +151,13 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
 (async function init() {
   await loadMe();
   await loadProgramColors();
+  await loadUsersList();
   await loadCourses();
   await loadLog();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('courses')) loadCourses();
     if (scopes.includes('activity')) loadLog();
+    if (scopes.includes('users')) loadUsersList();
     if (scopes.includes('programColors')) loadProgramColors().then(loadCourses);
   });
 })();

@@ -68,8 +68,14 @@ async function loadUsers() {
     </tr>
   `).join('');
 
-  const filter = document.getElementById('log-user-filter');
-  filter.innerHTML = '<option value="">All users</option>' + users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+  const logFilter = document.getElementById('log-user-filter');
+  logFilter.innerHTML = '<option value="">All users</option>' + users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+
+  const courseFilter = document.getElementById('admin-filter-user');
+  const current = courseFilter.value;
+  courseFilter.innerHTML = '<option value="">All users</option><option value="unassigned">Unassigned</option>'
+    + users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+  courseFilter.value = current;
 
   tbody.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', () => handleUserAction(btn.dataset.action, Number(btn.dataset.id)));
@@ -120,10 +126,23 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 // ---- Courses ----
 
 async function loadAdminCourses() {
-  const courses = (await api('/api/courses')).sort((a, b) => (b.priority === true) - (a.priority === true));
+  const userFilter = document.getElementById('admin-filter-user').value;
+  const categoryFilter = document.getElementById('admin-filter-category').value;
 
-  const categories = [...new Set(courses.map(c => c.category).filter(Boolean))].sort();
+  const allCourses = await api('/api/courses');
+
+  const categories = [...new Set(allCourses.map(c => c.category).filter(Boolean))].sort();
   document.getElementById('pc-category-options').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
+  const categorySelect = document.getElementById('admin-filter-category');
+  const currentCategory = categorySelect.value;
+  categorySelect.innerHTML = '<option value="">All categories</option>' + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  categorySelect.value = currentCategory;
+
+  let courses = allCourses;
+  if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
+  else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
+  if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
+  courses = courses.sort((a, b) => a.title.localeCompare(b.title));
 
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
@@ -136,10 +155,14 @@ async function loadAdminCourses() {
         </select>
         ${c.priority ? ' ' + priorityBadge() : ''}
       </td>
-      <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
+      <td>
+        <select data-id="${c.id}" data-action="assign">
+          <option value="">Unassigned</option>
+          ${users.map(u => `<option value="${u.id}" ${c.assignedTo === u.id ? 'selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
+        </select>
+      </td>
       <td>
         <button class="small" data-id="${c.id}" data-action="toggle-priority">${c.priority ? 'Unmark priority' : 'Mark priority'}</button>
-        ${c.assignedToName ? `<button class="small" data-id="${c.id}" data-action="unclaim">Unclaim</button>` : ''}
         <button class="small" data-id="${c.id}" data-action="delete">Delete</button>
       </td>
     </tr>
@@ -158,17 +181,16 @@ async function loadAdminCourses() {
       await loadAdminCourses();
     });
   });
-  tbody.querySelectorAll('button[data-action="unclaim"]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const course = courses.find(c => c.id === Number(btn.dataset.id));
-      if (!confirm(`Release ${escapeHtml(course.assignedToName)}'s claim on "${course.title}"?`)) return;
-      await api(`/api/courses/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ unclaim: true }) });
-      await loadAdminCourses();
-    });
-  });
   tbody.querySelectorAll('select[data-action="set-status"]').forEach(sel => {
     sel.addEventListener('change', async () => {
       await api(`/api/courses/${sel.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: sel.value }) });
+      await loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('select[data-action="assign"]').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const value = sel.value ? Number(sel.value) : null;
+      await api(`/api/courses/${sel.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ assignTo: value }) });
       await loadAdminCourses();
     });
   });
@@ -269,6 +291,8 @@ async function loadLogs() {
 }
 
 document.getElementById('log-user-filter').addEventListener('change', loadLogs);
+document.getElementById('admin-filter-user').addEventListener('change', loadAdminCourses);
+document.getElementById('admin-filter-category').addEventListener('change', loadAdminCourses);
 
 (async function init() {
   await loadMe();

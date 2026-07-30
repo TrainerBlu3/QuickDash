@@ -77,7 +77,13 @@
       <div id="program-color-rows"></div>
     </div>
     <div class="card">
-      <h2>All courses</h2>
+      <div class="row spread">
+        <h2 style="margin:0;">All courses</h2>
+        <div class="row small">
+          <select id="admin-filter-user"><option value="">All users</option></select>
+          <select id="admin-filter-category"><option value="">All categories</option></select>
+        </div>
+      </div>
       <table>
         <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr></thead>
         <tbody id="admin-course-rows"></tbody>

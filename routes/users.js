@@ -28,6 +28,12 @@ router.get('/', requireAuth, requireAdmin, (req, res) => {
   res.json(db.get('users').map(publicUser).value());
 });
 
+// Minimal, non-admin-only listing (id + name of active users) for filter
+// and assignment dropdowns that any logged-in user needs, not just admins.
+router.get('/list', requireAuth, (req, res) => {
+  res.json(db.get('users').filter({ active: true }).map(u => ({ id: u.id, name: u.name })).value());
+});
+
 router.post('/', requireAuth, requireAdmin, (req, res) => {
   const { username, name, role } = req.body || {};
   if (!username || !name) {
