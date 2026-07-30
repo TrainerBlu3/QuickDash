@@ -29,7 +29,7 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['users', 'courses', 'logs'].forEach(t => {
+    ['users', 'courses', 'colors', 'logs'].forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t === btn.dataset.tab ? 'block' : 'none';
     });
     if (btn.dataset.tab === 'logs') loadLogs();
@@ -125,6 +125,11 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 
 // ---- Courses ----
 
+// Every distinct category currently in use by a course, kept up to date by
+// loadAdminCourses() so the Brand colors tab can list categories that don't
+// have a color yet, not just ones that already do.
+let knownCategories = [];
+
 async function loadAdminCourses() {
   const userFilter = document.getElementById('admin-filter-user').value;
   const categoryFilter = document.getElementById('admin-filter-category').value;
@@ -132,6 +137,7 @@ async function loadAdminCourses() {
   const allCourses = await api('/api/courses');
 
   const categories = [...new Set(allCourses.map(c => c.category).filter(Boolean))].sort();
+  knownCategories = categories;
   document.getElementById('pc-category-options').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
   const categorySelect = document.getElementById('admin-filter-category');
   const currentCategory = categorySelect.value;
@@ -212,24 +218,29 @@ function setEditingCategory(cat) {
 async function loadProgramColors() {
   programColors = await api('/api/program-colors');
   const rowsEl = document.getElementById('program-color-rows');
-  const categories = Object.keys(programColors).sort();
+  // Union of categories that already have a color and ones that don't yet,
+  // so this list doubles as a checklist for "assign a color to everything."
+  const categories = [...new Set([...Object.keys(programColors), ...knownCategories])].sort();
   if (!categories.length) {
-    rowsEl.innerHTML = '<p class="muted small">No brand colors set yet.</p>';
+    rowsEl.innerHTML = '<p class="muted small">No categories yet — import or add some courses first.</p>';
     return;
   }
-  rowsEl.innerHTML = categories.map(cat => `
+  rowsEl.innerHTML = categories.map(cat => {
+    const color = programColors[cat];
+    return `
     <div class="swatch-row${cat === editingCategory ? ' editing' : ''}" data-category="${escapeHtml(cat)}" style="cursor:pointer;">
-      <span class="swatch swatch-lg" style="background:${escapeHtml(programColors[cat])}"></span>
+      <span class="swatch swatch-lg" style="background:${color ? escapeHtml(color) : 'transparent'};border-style:${color ? 'solid' : 'dashed'};"></span>
       <span>${escapeHtml(cat)}</span>
-      <span class="muted small">${escapeHtml(programColors[cat])}</span>
-      <button class="small" data-category="${escapeHtml(cat)}" data-action="delete-color">Remove</button>
+      <span class="muted small">${color ? escapeHtml(color) : 'No color set'}</span>
+      ${color ? `<button class="small" data-category="${escapeHtml(cat)}" data-action="delete-color">Remove</button>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
   rowsEl.querySelectorAll('.swatch-row').forEach(row => {
     row.addEventListener('click', () => {
       const cat = row.dataset.category;
       document.getElementById('pc-category').value = cat;
-      document.getElementById('pc-color').value = programColors[cat];
+      document.getElementById('pc-color').value = programColors[cat] || '#2a78d6';
       setEditingCategory(cat);
     });
   });
@@ -332,12 +343,12 @@ document.getElementById('admin-filter-category').addEventListener('change', load
 (async function init() {
   await loadMe();
   await loadUsers();
-  await loadProgramColors();
   await loadAdminCourses();
+  await loadProgramColors();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('users')) loadUsers();
-    if (scopes.includes('courses')) loadAdminCourses();
+    if (scopes.includes('courses')) loadAdminCourses().then(loadProgramColors);
     if (scopes.includes('activity')) loadLogs();
-    if (scopes.includes('programColors')) loadProgramColors().then(loadAdminCourses);
+    if (scopes.includes('programColors')) loadProgramColors();
   });
 })();
