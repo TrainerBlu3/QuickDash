@@ -198,6 +198,17 @@ async function loadAdminCourses() {
 
 // ---- Program brand colors ----
 
+// The category currently loaded into the form for editing, if any — lets
+// Save update that entry in place (renaming it if the category text
+// changed) instead of always creating a new one.
+let editingCategory = null;
+
+function setEditingCategory(cat) {
+  editingCategory = cat;
+  document.getElementById('pc-cancel-edit').style.display = cat ? 'inline-block' : 'none';
+  document.getElementById('pc-save-btn').textContent = cat ? 'Update' : 'Save';
+}
+
 async function loadProgramColors() {
   programColors = await api('/api/program-colors');
   const rowsEl = document.getElementById('program-color-rows');
@@ -207,21 +218,39 @@ async function loadProgramColors() {
     return;
   }
   rowsEl.innerHTML = categories.map(cat => `
-    <div class="swatch-row">
+    <div class="swatch-row${cat === editingCategory ? ' editing' : ''}" data-category="${escapeHtml(cat)}" style="cursor:pointer;">
       <span class="swatch swatch-lg" style="background:${escapeHtml(programColors[cat])}"></span>
       <span>${escapeHtml(cat)}</span>
       <span class="muted small">${escapeHtml(programColors[cat])}</span>
       <button class="small" data-category="${escapeHtml(cat)}" data-action="delete-color">Remove</button>
     </div>
   `).join('');
+  rowsEl.querySelectorAll('.swatch-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const cat = row.dataset.category;
+      document.getElementById('pc-category').value = cat;
+      document.getElementById('pc-color').value = programColors[cat];
+      setEditingCategory(cat);
+    });
+  });
   rowsEl.querySelectorAll('button[data-action="delete-color"]').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       await api(`/api/program-colors/${encodeURIComponent(btn.dataset.category)}`, { method: 'DELETE' });
+      if (btn.dataset.category === editingCategory) {
+        document.getElementById('program-color-form').reset();
+        setEditingCategory(null);
+      }
       await loadProgramColors();
       await loadAdminCourses();
     });
   });
 }
+
+document.getElementById('pc-cancel-edit').addEventListener('click', () => {
+  document.getElementById('program-color-form').reset();
+  setEditingCategory(null);
+});
 
 document.getElementById('program-color-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -229,7 +258,13 @@ document.getElementById('program-color-form').addEventListener('submit', async (
   const color = document.getElementById('pc-color').value;
   try {
     await api(`/api/program-colors/${encodeURIComponent(category)}`, { method: 'PUT', body: JSON.stringify({ color }) });
-    document.getElementById('pc-category').value = '';
+    // Renamed while editing (category text changed) — drop the old entry
+    // instead of leaving it behind as a near-duplicate.
+    if (editingCategory && editingCategory !== category) {
+      await api(`/api/program-colors/${encodeURIComponent(editingCategory)}`, { method: 'DELETE' });
+    }
+    document.getElementById('program-color-form').reset();
+    setEditingCategory(null);
     await loadProgramColors();
     await loadAdminCourses();
   } catch (err) {

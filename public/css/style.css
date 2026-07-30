@@ -136,7 +136,9 @@ tbody tr:hover { background: var(--page-plane); }
   border: 1px solid var(--border);
   vertical-align: middle;
 }
-.swatch-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.swatch-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; }
+.swatch-row:hover { background: var(--page-plane); }
+.swatch-row.editing { background: var(--priority-bg); }
 .swatch-lg { width: 20px; height: 20px; border-radius: 5px; flex: none; }
 .swatch-btn {
   width: 22px;

@@ -70,12 +70,13 @@
     </div>
     <div class="card">
       <h2>Program / course brand colors</h2>
-      <p class="muted small">Assign a brand color to a program or category (e.g. every "EA" course) — shown as a swatch next to the category everywhere in QuickDash.</p>
+      <p class="muted small">Assign a brand color to a program or category (e.g. every "EA" course) — shown as a swatch next to the category everywhere in QuickDash. Click an existing entry below to edit it instead of adding a new one.</p>
       <form id="program-color-form" class="inline">
         <input type="text" id="pc-category" list="pc-category-options" placeholder="Category (e.g. EA)" required>
         <datalist id="pc-category-options"></datalist>
         <input type="color" id="pc-color" value="#2a78d6">
-        <button type="submit" class="primary">Save</button>
+        <button type="submit" class="primary" id="pc-save-btn">Save</button>
+        <button type="button" id="pc-cancel-edit" class="small" style="display:none;">Cancel edit</button>
       </form>
       <div class="row small" style="margin-top:8px;gap:6px;align-items:center;">
         <span class="muted">Presets:</span>
