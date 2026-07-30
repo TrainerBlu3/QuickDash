@@ -307,11 +307,77 @@ function importRecords(rows, res, { replace = false } = {}) {
   });
 }
 
+// Registered ahead of PATCH /:id so "bulk" isn't swallowed as an :id value.
+// Applies assignTo and/or category to a set of courses in one request, for
+// cleaning up many rows at once (e.g. consolidating messy category
+// spellings, or handing a batch of courses to one person).
+router.patch('/bulk', requireAuth, requireAdmin, (req, res) => {
+  const { ids, assignTo, category } = req.body || {};
+  if (!Array.isArray(ids) || !ids.length) {
+    return res.status(400).json({ error: 'ids must be a non-empty array of course IDs' });
+  }
+  const currentUser = db.get('users').find({ id: req.session.userId }).value();
+
+  let target = null;
+  if (typeof assignTo !== 'undefined' && assignTo !== null) {
+    target = db.get('users').find({ id: Number(assignTo) }).value();
+    if (!target) return res.status(400).json({ error: 'User not found' });
+  }
+
+  let updated = 0;
+  for (const rawId of ids) {
+    const course = db.get('courses').find({ id: Number(rawId) }).value();
+    if (!course) continue;
+
+    const patch = { updatedAt: new Date().toISOString() };
+    let changed = false;
+
+    if (typeof assignTo !== 'undefined') {
+      if (assignTo === null) {
+        if (course.assignedTo) {
+          patch.assignedTo = null;
+          patch.assignedToName = null;
+          logActivity({
+            userId: currentUser.id, username: currentUser.name,
+            courseId: course.id, courseTitle: course.title,
+            action: 'unclaimed', fromStatus: course.status, toStatus: course.status,
+            notes: `Unassigned by admin (bulk action, was ${course.assignedToName})`
+          });
+          changed = true;
+        }
+      } else if (course.assignedTo !== target.id) {
+        patch.assignedTo = target.id;
+        patch.assignedToName = target.name;
+        logActivity({
+          userId: currentUser.id, username: currentUser.name,
+          courseId: course.id, courseTitle: course.title,
+          action: 'assigned', fromStatus: course.status, toStatus: course.status,
+          notes: `Assigned to ${target.name} by admin (bulk action)`
+        });
+        changed = true;
+      }
+    }
+
+    if (typeof category === 'string' && category.trim() !== course.category) {
+      patch.category = category.trim();
+      changed = true;
+    }
+
+    if (changed) {
+      db.get('courses').find({ id: course.id }).assign(patch).write();
+      updated += 1;
+    }
+  }
+
+  if (updated > 0) broadcast(['courses', 'activity']);
+  res.json({ updated });
+});
+
 router.patch('/:id', requireAuth, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
-  const { status, claim, unclaim, notes, priority, assignTo } = req.body || {};
+  const { status, claim, unclaim, notes, priority, assignTo, category } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
@@ -322,6 +388,11 @@ router.patch('/:id', requireAuth, (req, res) => {
   if (typeof priority === 'boolean') {
     if (!isAdmin) return res.status(403).json({ error: 'Only admins can change priority' });
     patch.priority = priority;
+  }
+
+  if (typeof category === 'string') {
+    if (!isAdmin) return res.status(403).json({ error: 'Only admins can change category' });
+    patch.category = category.trim();
   }
 
   // Admin directly assigning (or unassigning) a course to/from a specific

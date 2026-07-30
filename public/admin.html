@@ -100,8 +100,20 @@
           <select id="admin-filter-category"><option value="">All categories</option></select>
         </div>
       </div>
+      <div class="row small" id="bulk-actions" style="display:none;margin-bottom:10px;background:var(--page-plane);padding:8px 10px;border-radius:8px;">
+        <span class="muted" id="bulk-count"></span>
+        <select id="bulk-assign-user">
+          <option value="" disabled selected>Assign selected to…</option>
+          <option value="unassign">— Unassign —</option>
+        </select>
+        <button type="button" class="small" id="bulk-assign-btn">Apply</button>
+        <input type="text" id="bulk-category" list="pc-category-options" placeholder="Set category to…" style="width:160px;">
+        <button type="button" class="small" id="bulk-category-btn">Apply</button>
+        <button type="button" class="small" id="bulk-clear-btn">Clear selection</button>
+      </div>
       <table>
         <thead><tr>
+          <th><input type="checkbox" id="select-all-courses" title="Select all visible"></th>
           <th data-sort="title">Course<span class="sort-arrow"></span></th>
           <th data-sort="crn">CRN<span class="sort-arrow"></span></th>
           <th data-sort="category">Category<span class="sort-arrow"></span></th>

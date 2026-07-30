@@ -78,6 +78,10 @@ async function loadUsers() {
     + users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
   courseFilter.value = current;
 
+  const bulkAssign = document.getElementById('bulk-assign-user');
+  bulkAssign.innerHTML = '<option value="" disabled selected>Assign selected to…</option><option value="unassign">— Unassign —</option>'
+    + users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+
   tbody.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', () => handleUserAction(btn.dataset.action, Number(btn.dataset.id)));
   });
@@ -131,6 +135,21 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 // have a color yet, not just ones that already do.
 let knownCategories = [];
 
+// Course IDs checked for a bulk action. Persists across re-renders (filter
+// changes, sort clicks, live updates) since it's not tied to any one
+// render pass — only "Clear selection" or a bulk action resets it.
+let selectedCourseIds = new Set();
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-actions');
+  if (selectedCourseIds.size === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  document.getElementById('bulk-count').textContent = `${selectedCourseIds.size} selected`;
+}
+
 async function loadAdminCourses() {
   const userFilter = document.getElementById('admin-filter-user').value;
   const categoryFilter = document.getElementById('admin-filter-category').value;
@@ -154,6 +173,7 @@ async function loadAdminCourses() {
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
     <tr>
+      <td><input type="checkbox" class="course-select" data-id="${c.id}" ${selectedCourseIds.has(c.id) ? 'checked' : ''}></td>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.crn || '—')}</td>
       <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
@@ -175,9 +195,18 @@ async function loadAdminCourses() {
       </td>
     </tr>
   `).join('');
+  updateBulkBar();
+  tbody.querySelectorAll('input.course-select').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = Number(cb.dataset.id);
+      if (cb.checked) selectedCourseIds.add(id); else selectedCourseIds.delete(id);
+      updateBulkBar();
+    });
+  });
   tbody.querySelectorAll('button[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('Delete this course? This does not delete its activity history.')) return;
+      selectedCourseIds.delete(Number(btn.dataset.id));
       await api(`/api/courses/${btn.dataset.id}`, { method: 'DELETE' });
       await loadAdminCourses();
     });
@@ -408,6 +437,57 @@ async function loadLogs() {
 document.getElementById('log-user-filter').addEventListener('change', loadLogs);
 document.getElementById('admin-filter-user').addEventListener('change', loadAdminCourses);
 document.getElementById('admin-filter-category').addEventListener('change', loadAdminCourses);
+
+// ---- Bulk actions on the courses table ----
+
+document.getElementById('select-all-courses').addEventListener('change', (e) => {
+  document.querySelectorAll('input.course-select').forEach(cb => {
+    cb.checked = e.target.checked;
+    const id = Number(cb.dataset.id);
+    if (e.target.checked) selectedCourseIds.add(id); else selectedCourseIds.delete(id);
+  });
+  updateBulkBar();
+});
+
+document.getElementById('bulk-clear-btn').addEventListener('click', () => {
+  selectedCourseIds.clear();
+  document.querySelectorAll('input.course-select').forEach(cb => { cb.checked = false; });
+  document.getElementById('select-all-courses').checked = false;
+  updateBulkBar();
+});
+
+document.getElementById('bulk-assign-btn').addEventListener('click', async () => {
+  const value = document.getElementById('bulk-assign-user').value;
+  if (!value) { alert('Choose a user (or "— Unassign —") first.'); return; }
+  const ids = [...selectedCourseIds];
+  const assignTo = value === 'unassign' ? null : Number(value);
+  const label = value === 'unassign' ? 'Unassign' : users.find(u => u.id === assignTo)?.name;
+  if (!confirm(`${label} ${ids.length} course${ids.length === 1 ? '' : 's'}?`)) return;
+  try {
+    await api('/api/courses/bulk', { method: 'PATCH', body: JSON.stringify({ ids, assignTo }) });
+    selectedCourseIds.clear();
+    document.getElementById('select-all-courses').checked = false;
+    await loadAdminCourses();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+document.getElementById('bulk-category-btn').addEventListener('click', async () => {
+  const category = document.getElementById('bulk-category').value.trim();
+  if (!category) { alert('Enter a category to set.'); return; }
+  const ids = [...selectedCourseIds];
+  if (!confirm(`Set category to "${category}" for ${ids.length} course${ids.length === 1 ? '' : 's'}?`)) return;
+  try {
+    await api('/api/courses/bulk', { method: 'PATCH', body: JSON.stringify({ ids, category }) });
+    document.getElementById('bulk-category').value = '';
+    selectedCourseIds.clear();
+    document.getElementById('select-all-courses').checked = false;
+    await loadAdminCourses();
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 (async function init() {
   await loadMe();
