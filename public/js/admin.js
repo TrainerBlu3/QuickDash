@@ -301,18 +301,51 @@ document.getElementById('course-form').addEventListener('submit', async (e) => {
   }
 });
 
+// Preview step: parses the file and shows what each row would resolve to,
+// without importing anything, so a cutoff row can be chosen (e.g. to leave
+// out trailing notes rows below the real course data).
 document.getElementById('import-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fileInput = document.getElementById('import-file');
   if (!fileInput.files[0]) return;
   const formData = new FormData();
   formData.append('file', fileInput.files[0]);
-  const res = await fetch('/api/courses/import', { method: 'POST', body: formData });
-  const data = await res.json();
   const resultEl = document.getElementById('import-result');
-  if (!res.ok) {
-    resultEl.textContent = data.error || 'Import failed';
-  } else {
+  resultEl.textContent = '';
+  try {
+    const data = await api('/api/courses/import/preview', { method: 'POST', headers: {}, body: formData });
+    document.getElementById('import-total-rows').textContent = data.totalRows;
+    const uptoInput = document.getElementById('import-upto');
+    uptoInput.max = data.totalRows;
+    uptoInput.value = data.totalRows;
+    document.getElementById('import-preview-rows').innerHTML = data.preview.map(r => `
+      <tr>
+        <td class="muted small">${r.row}</td>
+        <td>${escapeHtml(r.title)}</td>
+        <td class="muted">${escapeHtml(r.category || '—')}</td>
+        <td class="muted">${escapeHtml(r.crn || '—')}</td>
+      </tr>
+    `).join('');
+    document.getElementById('import-preview').style.display = 'block';
+  } catch (err) {
+    resultEl.textContent = err.message;
+  }
+});
+
+document.getElementById('import-cancel-btn').addEventListener('click', () => {
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-form').reset();
+});
+
+document.getElementById('import-confirm-btn').addEventListener('click', async () => {
+  const fileInput = document.getElementById('import-file');
+  if (!fileInput.files[0]) return;
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('upTo', document.getElementById('import-upto').value);
+  const resultEl = document.getElementById('import-result');
+  try {
+    const data = await api('/api/courses/import', { method: 'POST', headers: {}, body: formData });
     const notes = [];
     if (data.duplicates) {
       notes.push(data.updated
@@ -323,7 +356,10 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
     if (data.colorDetected) notes.push(`from cell colors: ${data.colorDetected.done} marked done, ${data.colorDetected.priority} marked priority`);
     resultEl.textContent = `Added ${data.created} new course${data.created === 1 ? '' : 's'} of ${data.totalRows} rows${notes.length ? ` (${notes.join('; ')})` : ''}.`;
     fileInput.value = '';
+    document.getElementById('import-preview').style.display = 'none';
     await loadAdminCourses();
+  } catch (err) {
+    resultEl.textContent = err.message;
   }
 });
 

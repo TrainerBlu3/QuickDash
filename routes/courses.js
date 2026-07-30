@@ -133,7 +133,41 @@ router.post('/import', requireAuth, requireAdmin, (req, res) => {
       return res.status(400).json({ error: `Could not parse file: ${err.message}` });
     }
 
+    // Optional cutoff (from the preview step) — only parse/import the
+    // sheet's first N data rows, e.g. to leave out trailing notes or a
+    // second table that isn't actually course data.
+    const upTo = Number(req.body.upTo);
+    if (Number.isFinite(upTo) && upTo > 0) {
+      rows = rows.slice(0, upTo);
+    }
+
     importRecords(rows, res);
+  });
+});
+
+// Parses the file and reports what each row would resolve to, without
+// writing anything — lets the admin see where the real data ends (e.g.
+// trailing notes rows) and choose a cutoff before committing to /import.
+router.post('/import/preview', requireAuth, requireAdmin, (req, res) => {
+  upload.single('file')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'A CSV or Excel file is required (field name "file")' });
+
+    let rows;
+    try {
+      rows = await parseSpreadsheet(req.file.buffer, req.file.originalname);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not parse file: ${err.message}` });
+    }
+
+    const preview = rows.map((row, i) => ({
+      row: i + 1,
+      title: deriveTitle(row.fields) || '(missing title — would be skipped)',
+      category: (findValue(row.fields, CATEGORY_KEY) || '').trim(),
+      crn: (findCrnValue(row.fields) || '').trim()
+    }));
+
+    res.json({ totalRows: rows.length, preview });
   });
 });
 
@@ -162,6 +196,13 @@ function findCrnValue(fields) {
   return '';
 }
 
+function deriveTitle(fields) {
+  const baseTitle = findValue(fields, TITLE_KEY);
+  if (!baseTitle || !baseTitle.trim()) return '';
+  const instructor = findValue(fields, INSTRUCTOR_KEY);
+  return instructor && instructor.trim() ? `${baseTitle.trim()} — ${instructor.trim()}` : baseTitle.trim();
+}
+
 function importRecords(rows, res) {
   // Match existing courses by title (case-insensitive) so re-importing an
   // updated export only adds new rows and never touches a course's status,
@@ -183,15 +224,11 @@ function importRecords(rows, res) {
   let colorPriority = 0;
   for (const row of rows) {
     const { fields, color } = row;
-    const baseTitle = findValue(fields, TITLE_KEY);
-    if (!baseTitle || !baseTitle.trim()) {
+    const title = deriveTitle(fields);
+    if (!title) {
       skipped += 1;
       continue;
     }
-    const instructor = findValue(fields, INSTRUCTOR_KEY);
-    const title = instructor && instructor.trim()
-      ? `${baseTitle.trim()} — ${instructor.trim()}`
-      : baseTitle.trim();
 
     const key = title.toLowerCase();
     const existing = existingByTitle.get(key);

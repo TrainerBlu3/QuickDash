@@ -57,8 +57,27 @@
       <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>category</b>/<b>program</b>, <b>crn</b>/<b>section</b>, <b>instructor</b> (folded into the title so repeated course codes track as separate sections). For .xlsx/.xls, status is read straight from the cell's fill color — <b>green = done</b>, any other color = marked priority, white/no fill = not started — no status column needed (a text <b>status</b>/<b>color</b> column is used instead if one exists). Safe to re-import later with an updated export — a row matched by title to a course already in QuickDash never has its status, priority, assignment, or notes touched, though its category/CRN get backfilled if the new export has a value for them; only unmatched rows are added as new courses.</p>
       <form id="import-form" class="inline">
         <input type="file" id="import-file" accept=".csv,.xlsx,.xls" required>
-        <button type="submit" class="primary">Import</button>
+        <button type="submit" class="primary">Preview</button>
       </form>
+      <div id="import-preview" style="display:none;margin-top:12px;">
+        <p class="small muted">
+          Detected <b id="import-total-rows">0</b> data row(s). Review below, choose how far to
+          import, then confirm — nothing is added until you click Import.
+        </p>
+        <div class="row small">
+          <label class="row small">Import rows 1 through
+            <input type="number" id="import-upto" min="1" style="width:90px;">
+          </label>
+          <button type="button" class="primary" id="import-confirm-btn">Import</button>
+          <button type="button" class="small" id="import-cancel-btn">Cancel</button>
+        </div>
+        <div style="max-height:280px;overflow-y:auto;margin-top:8px;">
+          <table>
+            <thead><tr><th>Row</th><th>Title</th><th>Category</th><th>CRN</th></tr></thead>
+            <tbody id="import-preview-rows"></tbody>
+          </table>
+        </div>
+      </div>
       <p class="small muted" id="import-result"></p>
     </div>
     <div class="card">
