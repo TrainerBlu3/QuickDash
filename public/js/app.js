@@ -1,4 +1,9 @@
 let me = null;
+let programColors = {};
+
+async function loadProgramColors() {
+  programColors = await api('/api/program-colors');
+}
 
 async function loadMe() {
   me = await api('/api/auth/me');
@@ -43,7 +48,7 @@ async function loadCourses() {
     if (isMine && c.status !== 'done') actions += `<button class="small" data-action="unclaim" data-id="${c.id}">Give back</button> `;
     return `<tr>
       <td>${escapeHtml(c.title)}</td>
-      <td class="muted">${escapeHtml(c.category || '—')}</td>
+      <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
       <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
       <td>${actions}</td>
@@ -113,10 +118,12 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
 
 (async function init() {
   await loadMe();
+  await loadProgramColors();
   await loadCourses();
   await loadLog();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('courses')) loadCourses();
     if (scopes.includes('activity')) loadLog();
+    if (scopes.includes('programColors')) loadProgramColors().then(loadCourses);
   });
 })();

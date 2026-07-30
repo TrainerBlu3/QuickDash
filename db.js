@@ -14,6 +14,7 @@ db.defaults({
   users: [],
   courses: [],
   activity: [],
+  programColors: {}, // category/program name -> hex brand color
   nextIds: { user: 1, course: 1, activity: 1 }
 }).write();
 

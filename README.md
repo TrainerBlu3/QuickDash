@@ -30,6 +30,13 @@ color-coding with real status tracking and a per-user activity log.
   fill → not started (a text `status`/`color` column is used instead if the
   sheet has one). Handles Excel's theme-color + tint shading, not just
   plain RGB fills, and per-row color doesn't have to span every column.
+- **Program brand colors** — admins can assign a color to a category/program
+  (e.g. all "EA" courses) from the Admin → Courses tab; it shows as a small
+  swatch next to the category everywhere. This is separate from the
+  done/priority status coloring above — it's just a visual label.
+- **Admin overrides** — admins can set any course's status directly
+  (including rolling "done" back to "not started"), release someone's claim
+  ("Unclaim"), or mark/unmark priority, all from the Admin → Courses table.
 
 ## Getting started
 

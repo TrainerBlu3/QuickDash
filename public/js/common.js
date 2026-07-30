@@ -8,6 +8,13 @@ function priorityBadge() {
   return `<span class="badge priority" title="Marked higher priority">★ Priority</span>`;
 }
 
+// A small color swatch for a course's category, if a brand color is set for it.
+function categorySwatch(category, programColors) {
+  const color = programColors && programColors[category];
+  if (!color) return '';
+  return `<span class="swatch" style="background:${escapeHtml(color)}" title="${escapeHtml(category)} brand color: ${escapeHtml(color)}"></span>`;
+}
+
 function fmtTime(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }

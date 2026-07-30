@@ -1,4 +1,5 @@
 let users = [];
+let programColors = {};
 
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -96,11 +97,15 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 
 async function loadAdminCourses() {
   const courses = (await api('/api/courses')).sort((a, b) => (b.priority === true) - (a.priority === true));
+
+  const categories = [...new Set(courses.map(c => c.category).filter(Boolean))].sort();
+  document.getElementById('pc-category-options').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
+
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
     <tr>
       <td>${escapeHtml(c.title)}</td>
-      <td class="muted">${escapeHtml(c.category || '—')}</td>
+      <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
       <td>
         <select data-id="${c.id}" data-action="set-status">
           ${['not_started', 'in_progress', 'done'].map(s => `<option value="${s}" ${s === c.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
@@ -144,6 +149,47 @@ async function loadAdminCourses() {
     });
   });
 }
+
+// ---- Program brand colors ----
+
+async function loadProgramColors() {
+  programColors = await api('/api/program-colors');
+  const rowsEl = document.getElementById('program-color-rows');
+  const categories = Object.keys(programColors).sort();
+  if (!categories.length) {
+    rowsEl.innerHTML = '<p class="muted small">No brand colors set yet.</p>';
+    return;
+  }
+  rowsEl.innerHTML = categories.map(cat => `
+    <div class="swatch-row">
+      <span class="swatch swatch-lg" style="background:${escapeHtml(programColors[cat])}"></span>
+      <span>${escapeHtml(cat)}</span>
+      <span class="muted small">${escapeHtml(programColors[cat])}</span>
+      <button class="small" data-category="${escapeHtml(cat)}" data-action="delete-color">Remove</button>
+    </div>
+  `).join('');
+  rowsEl.querySelectorAll('button[data-action="delete-color"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await api(`/api/program-colors/${encodeURIComponent(btn.dataset.category)}`, { method: 'DELETE' });
+      await loadProgramColors();
+      await loadAdminCourses();
+    });
+  });
+}
+
+document.getElementById('program-color-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const category = document.getElementById('pc-category').value.trim();
+  const color = document.getElementById('pc-color').value;
+  try {
+    await api(`/api/program-colors/${encodeURIComponent(category)}`, { method: 'PUT', body: JSON.stringify({ color }) });
+    document.getElementById('pc-category').value = '';
+    await loadProgramColors();
+    await loadAdminCourses();
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 document.getElementById('course-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -203,10 +249,12 @@ document.getElementById('log-user-filter').addEventListener('change', loadLogs);
 (async function init() {
   await loadMe();
   await loadUsers();
+  await loadProgramColors();
   await loadAdminCourses();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('users')) loadUsers();
     if (scopes.includes('courses')) loadAdminCourses();
     if (scopes.includes('activity')) loadLogs();
+    if (scopes.includes('programColors')) loadProgramColors().then(loadAdminCourses);
   });
 })();

@@ -62,6 +62,17 @@
       </form>
     </div>
     <div class="card">
+      <h2>Program / course brand colors</h2>
+      <p class="muted small">Assign a brand color to a program or category (e.g. every "EA" course) — shown as a swatch next to the category everywhere in QuickDash.</p>
+      <form id="program-color-form" class="inline">
+        <input type="text" id="pc-category" list="pc-category-options" placeholder="Category (e.g. EA)" required>
+        <datalist id="pc-category-options"></datalist>
+        <input type="color" id="pc-color" value="#2a78d6">
+        <button type="submit" class="primary">Save</button>
+      </form>
+      <div id="program-color-rows"></div>
+    </div>
+    <div class="card">
       <h2>All courses</h2>
       <table>
         <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr></thead>
