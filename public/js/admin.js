@@ -1,6 +1,30 @@
 let users = [];
 let programColors = {};
 
+// Named theme presets for the brand-color picker (quick-pick swatches).
+// Each swatch uses the theme's "circle" value — the color the theme design
+// uses to represent itself, matching how QuickDash shows a single swatch.
+const COLOR_PRESETS = [
+  { name: 'lake', circle: '#005F63' },
+  { name: 'sky', circle: '#2ECDDC' },
+  { name: 'sunset', circle: '#FF8204' },
+  { name: 'peach', circle: '#DE4F3D' },
+  { name: 'cherry', circle: '#E10040' },
+  { name: 'cabernet', circle: '#782434' },
+  { name: 'lavender', circle: '#50037F' },
+  { name: 'lilac', circle: '#CA9CE4' },
+  { name: 'charcoal', circle: '#50534C' }
+];
+
+document.getElementById('pc-presets').innerHTML = COLOR_PRESETS.map(p => `
+  <button type="button" class="swatch-btn" style="background:${p.circle}" title="${p.name} (${p.circle})" data-color="${p.circle}"></button>
+`).join('');
+document.getElementById('pc-presets').querySelectorAll('button[data-color]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('pc-color').value = btn.dataset.color;
+  });
+});
+
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));

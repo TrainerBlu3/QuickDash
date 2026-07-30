@@ -138,6 +138,16 @@ tbody tr:hover { background: var(--page-plane); }
 }
 .swatch-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 .swatch-lg { width: 20px; height: 20px; border-radius: 5px; flex: none; }
+.swatch-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+.swatch-btn:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
 .badge.not_started { background: var(--status-critical-bg); color: var(--status-critical); }
 .badge.not_started .dot { background: var(--status-critical); }
 .badge.in_progress { background: var(--status-warning-bg); color: var(--status-warning); }
