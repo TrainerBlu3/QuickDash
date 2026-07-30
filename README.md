@@ -73,6 +73,8 @@ gives each person an empty, unsynced database.
   VM, a spare server) behind a process manager (pm2/systemd) so it
   survives restarts, with a real `SESSION_SECRET` and HTTPS in front of it
   (e.g. via Caddy or nginx) since login passwords travel over the network.
+  See [DEPLOY.md](DEPLOY.md) for a concrete, free walkthrough on a Google
+  Cloud Always Free VM.
 
 ## Data storage
 

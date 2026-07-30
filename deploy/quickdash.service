@@ -1,0 +1,21 @@
+[Unit]
+Description=QuickDash course redesign tracker
+After=network.target
+
+[Service]
+Type=simple
+User=quickdash
+Group=quickdash
+WorkingDirectory=/opt/quickdash
+EnvironmentFile=/opt/quickdash/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+# Sandboxing: the app only needs to write to its data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/quickdash/data
+
+[Install]
+WantedBy=multi-user.target

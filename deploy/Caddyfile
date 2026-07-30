@@ -1,0 +1,9 @@
+# Replace the line below with your VM's static external IP written with
+# dashes instead of dots, e.g. 34.123.45.67 -> 34-123-45-67.sslip.io
+#
+# sslip.io resolves that hostname straight back to the IP with zero DNS
+# setup, which is what lets Caddy request a real, free Let's Encrypt
+# certificate automatically (a bare IP address can't get one).
+34-123-45-67.sslip.io {
+	reverse_proxy localhost:3000
+}
