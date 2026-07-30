@@ -26,7 +26,12 @@ color-coding with real status tracking and a per-user activity log.
   an updated export — a row matched by title to a course that already
   exists never has its status, priority, assignment, or notes touched (so a
   claim or in-progress mark always survives), though its category/CRN do
-  get backfilled if the import has a non-blank value for them.
+  get backfilled if the import has a non-blank value for them. A preview
+  step (with a row-by-row breakdown) runs before anything is written, so a
+  row cutoff can be chosen — e.g. to leave out trailing notes rows — and an
+  optional **Replace** mode can additionally delete existing courses that
+  aren't present in the file, for a sheet that's been audited down to fewer
+  courses (their activity history is kept regardless).
 - **CRN** — courses with a CRN (an actively scheduled section, as opposed
   to a placeholder) sort above ones without, right under anything marked
   priority.

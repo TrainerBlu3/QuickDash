@@ -54,7 +54,7 @@
   <section id="tab-courses" style="display:none;">
     <div class="card">
       <h2>Import from spreadsheet</h2>
-      <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>category</b>/<b>program</b>, <b>crn</b>/<b>section</b>, <b>instructor</b> (folded into the title so repeated course codes track as separate sections). For .xlsx/.xls, status is read straight from the cell's fill color — <b>green = done</b>, any other color = marked priority, white/no fill = not started — no status column needed (a text <b>status</b>/<b>color</b> column is used instead if one exists). Safe to re-import later with an updated export — a row matched by title to a course already in QuickDash never has its status, priority, assignment, or notes touched, though its category/CRN get backfilled if the new export has a value for them; only unmatched rows are added as new courses.</p>
+      <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>category</b>/<b>program</b>, <b>crn</b>/<b>section</b>, <b>instructor</b> (folded into the title so repeated course codes track as separate sections). For .xlsx/.xls, status is read straight from the cell's fill color — <b>green = done</b>, any other color = marked priority, white/no fill = not started — no status column needed (a text <b>status</b>/<b>color</b> column is used instead if one exists). Safe to re-import later with an updated export — a row matched by title to a course already in QuickDash never has its status, priority, assignment, or notes touched, though its category/CRN get backfilled if the new export has a value for them; only unmatched rows are added as new courses. Optionally enable <b>Replace</b> in the preview step to also delete existing courses that aren't in the file (e.g. after auditing a sheet down to fewer courses) — their activity history is kept either way.</p>
       <form id="import-form" class="inline">
         <input type="file" id="import-file" accept=".csv,.xlsx,.xls" required>
         <button type="submit" class="primary">Preview</button>
@@ -67,6 +67,9 @@
         <div class="row small">
           <label class="row small">Import rows 1 through
             <input type="number" id="import-upto" min="1" style="width:90px;">
+          </label>
+          <label class="row small" title="Deletes any existing course whose title isn't in this file (within the row range above). Activity history is kept; the course entry itself is removed.">
+            <input type="checkbox" id="import-replace"> Replace — remove existing courses not in this file
           </label>
           <button type="button" class="primary" id="import-confirm-btn">Import</button>
           <button type="button" class="small" id="import-cancel-btn">Cancel</button>

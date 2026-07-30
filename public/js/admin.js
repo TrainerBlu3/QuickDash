@@ -301,6 +301,11 @@ document.getElementById('course-form').addEventListener('submit', async (e) => {
   }
 });
 
+// Preview rows from the last /import/preview call, kept around so the
+// confirm step can work out exactly which existing courses "Replace" mode
+// would remove before asking the admin to confirm that.
+let lastImportPreview = [];
+
 // Preview step: parses the file and shows what each row would resolve to,
 // without importing anything, so a cutoff row can be chosen (e.g. to leave
 // out trailing notes rows below the real course data).
@@ -314,14 +319,16 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
   resultEl.textContent = '';
   try {
     const data = await api('/api/courses/import/preview', { method: 'POST', headers: {}, body: formData });
+    lastImportPreview = data.preview;
     document.getElementById('import-total-rows').textContent = data.totalRows;
     const uptoInput = document.getElementById('import-upto');
     uptoInput.max = data.totalRows;
     uptoInput.value = data.totalRows;
+    document.getElementById('import-replace').checked = false;
     document.getElementById('import-preview-rows').innerHTML = data.preview.map(r => `
       <tr>
         <td class="muted small">${r.row}</td>
-        <td>${escapeHtml(r.title)}</td>
+        <td>${r.title ? escapeHtml(r.title) : '<span class="muted">(missing title — skipped)</span>'}</td>
         <td class="muted">${escapeHtml(r.category || '—')}</td>
         <td class="muted">${escapeHtml(r.crn || '—')}</td>
       </tr>
@@ -340,9 +347,27 @@ document.getElementById('import-cancel-btn').addEventListener('click', () => {
 document.getElementById('import-confirm-btn').addEventListener('click', async () => {
   const fileInput = document.getElementById('import-file');
   if (!fileInput.files[0]) return;
+  const upTo = Number(document.getElementById('import-upto').value);
+  const replace = document.getElementById('import-replace').checked;
+
+  if (replace) {
+    const keepTitles = new Set(
+      lastImportPreview.slice(0, upTo).filter(r => r.title).map(r => r.title.trim().toLowerCase())
+    );
+    const currentCourses = await api('/api/courses');
+    const toRemove = currentCourses.filter(c => !keepTitles.has(c.title.trim().toLowerCase()));
+    if (!toRemove.length) {
+      if (!confirm('Replace mode is on, but every existing course is present in this file — nothing would be removed. Continue with the import?')) return;
+    } else if (!confirm(
+      `Replace mode: this will DELETE ${toRemove.length} existing course${toRemove.length === 1 ? '' : 's'} not present in the first ${upTo} row${upTo === 1 ? '' : 's'} of this file ` +
+      `(their activity history is kept; the course entries themselves are gone). This cannot be undone. Continue?`
+    )) return;
+  }
+
   const formData = new FormData();
   formData.append('file', fileInput.files[0]);
-  formData.append('upTo', document.getElementById('import-upto').value);
+  formData.append('upTo', upTo);
+  if (replace) formData.append('replace', 'true');
   const resultEl = document.getElementById('import-result');
   try {
     const data = await api('/api/courses/import', { method: 'POST', headers: {}, body: formData });
@@ -352,6 +377,7 @@ document.getElementById('import-confirm-btn').addEventListener('click', async ()
         ? `${data.duplicates} already existed (${data.updated} had their category/CRN updated)`
         : `${data.duplicates} already existed, left untouched`);
     }
+    if (data.removed) notes.push(`${data.removed} existing course${data.removed === 1 ? '' : 's'} removed (not in this file)`);
     if (data.skipped) notes.push(`${data.skipped} skipped — missing title`);
     if (data.colorDetected) notes.push(`from cell colors: ${data.colorDetected.done} marked done, ${data.colorDetected.priority} marked priority`);
     resultEl.textContent = `Added ${data.created} new course${data.created === 1 ? '' : 's'} of ${data.totalRows} rows${notes.length ? ` (${notes.join('; ')})` : ''}.`;

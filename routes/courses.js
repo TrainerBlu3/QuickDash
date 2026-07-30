@@ -141,7 +141,8 @@ router.post('/import', requireAuth, requireAdmin, (req, res) => {
       rows = rows.slice(0, upTo);
     }
 
-    importRecords(rows, res);
+    const replace = req.body.replace === 'true' || req.body.replace === true;
+    importRecords(rows, res, { replace });
   });
 });
 
@@ -162,7 +163,7 @@ router.post('/import/preview', requireAuth, requireAdmin, (req, res) => {
 
     const preview = rows.map((row, i) => ({
       row: i + 1,
-      title: deriveTitle(row.fields) || '(missing title — would be skipped)',
+      title: deriveTitle(row.fields),
       category: (findValue(row.fields, CATEGORY_KEY) || '').trim(),
       crn: (findCrnValue(row.fields) || '').trim()
     }));
@@ -203,7 +204,7 @@ function deriveTitle(fields) {
   return instructor && instructor.trim() ? `${baseTitle.trim()} — ${instructor.trim()}` : baseTitle.trim();
 }
 
-function importRecords(rows, res) {
+function importRecords(rows, res, { replace = false } = {}) {
   // Match existing courses by title (case-insensitive) so re-importing an
   // updated export only adds new rows and never touches a course's status,
   // priority, assignment, or notes — a claim or in-progress mark always
@@ -214,7 +215,13 @@ function importRecords(rows, res) {
   // an instructor column is present, it's folded into the title (e.g.
   // "EA 111 — Tanya Fleck") so that a course code repeated across multiple
   // sections is tracked as separate rows instead of being collapsed into one.
+  //
+  // In `replace` mode, once every row is processed, any existing course
+  // whose title never showed up in this file gets deleted (its activity
+  // history is untouched — only the course entry itself goes) — for
+  // spreadsheets that have been audited down and shouldn't leave stragglers.
   const existingByTitle = new Map(db.get('courses').value().map(c => [c.title.trim().toLowerCase(), c]));
+  const seenTitles = new Set();
 
   let created = 0;
   let duplicates = 0;
@@ -231,6 +238,7 @@ function importRecords(rows, res) {
     }
 
     const key = title.toLowerCase();
+    seenTitles.add(key);
     const existing = existingByTitle.get(key);
     if (existing) {
       duplicates += 1;
@@ -280,11 +288,19 @@ function importRecords(rows, res) {
     created += 1;
   }
 
-  if (created > 0 || updated > 0) broadcast('courses');
+  let removed = 0;
+  if (replace) {
+    const toRemove = db.get('courses').value().filter(c => !seenTitles.has(c.title.trim().toLowerCase()));
+    toRemove.forEach(c => db.get('courses').remove({ id: c.id }).write());
+    removed = toRemove.length;
+  }
+
+  if (created > 0 || updated > 0 || removed > 0) broadcast('courses');
   res.json({
     created,
     duplicates,
     updated,
+    removed,
     skipped,
     totalRows: rows.length,
     colorDetected: rows.some(r => r.color) ? { done: colorDone, priority: colorPriority } : null
