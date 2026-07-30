@@ -54,7 +54,7 @@
   <section id="tab-courses" style="display:none;">
     <div class="card">
       <h2>Import from spreadsheet</h2>
-      <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>category</b>/<b>program</b>, <b>instructor</b> (folded into the title so repeated course codes track as separate sections). For .xlsx/.xls, status is read straight from the cell's fill color — <b>green = done</b>, any other color = marked priority, white/no fill = not started — no status column needed (a text <b>status</b>/<b>color</b> column is used instead if one exists). Safe to re-import later with an updated export — rows already in QuickDash (matched by title) are left untouched, only new rows get added.</p>
+      <p class="muted small">Drop in your spreadsheet directly — <b>.xlsx</b>, <b>.xls</b>, or <b>.csv</b> all work. Columns recognized: <b>title</b> (or "course"), <b>category</b>/<b>program</b>, <b>crn</b>/<b>section</b>, <b>instructor</b> (folded into the title so repeated course codes track as separate sections). For .xlsx/.xls, status is read straight from the cell's fill color — <b>green = done</b>, any other color = marked priority, white/no fill = not started — no status column needed (a text <b>status</b>/<b>color</b> column is used instead if one exists). Safe to re-import later with an updated export — rows already in QuickDash (matched by title) are left untouched, only new rows get added.</p>
       <form id="import-form" class="inline">
         <input type="file" id="import-file" accept=".csv,.xlsx,.xls" required>
         <button type="submit" class="primary">Import</button>
@@ -66,6 +66,7 @@
       <form id="course-form" class="inline">
         <input type="text" id="course-title" placeholder="Course title" required>
         <input type="text" id="course-category" placeholder="Category (optional)">
+        <input type="text" id="course-crn" placeholder="CRN (optional)">
         <button type="submit" class="primary">Add</button>
       </form>
     </div>
@@ -78,7 +79,7 @@
         </div>
       </div>
       <table>
-        <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr></thead>
+        <thead><tr><th>Course</th><th>CRN</th><th>Category</th><th>Status</th><th>Assigned to</th><th></th></tr></thead>
         <tbody id="admin-course-rows"></tbody>
       </table>
     </div>

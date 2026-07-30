@@ -20,11 +20,14 @@ color-coding with real status tracking and a per-user activity log.
   hand off; the user sets their own password on first login.
 - **Spreadsheet import** — drop in `.xlsx`, `.xls`, or `.csv` directly, no
   need to save as CSV first. Columns `title`/`course`, `category`/`program`,
-  and `instructor` (folded into the title, e.g. "EA 111 — Tanya Fleck", so a
-  course code repeated across sections tracks as separate rows instead of
-  collapsing into one) are recognized. Safe to re-run with an updated
-  export — only new rows (matched by title) get added; existing courses are
-  left alone.
+  `crn`/`section`, and `instructor` (folded into the title, e.g. "EA 111 —
+  Tanya Fleck", so a course code repeated across sections tracks as separate
+  rows instead of collapsing into one) are recognized. Safe to re-run with
+  an updated export — only new rows (matched by title) get added; existing
+  courses are left alone.
+- **CRN** — courses with a CRN (an actively scheduled section, as opposed
+  to a placeholder) sort above ones without, right under anything marked
+  priority.
 - **Reads cell color directly for `.xlsx`/`.xls`** — no status column
   needed. Green fill → done, any other fill → marked priority, white/no
   fill → not started (a text `status`/`color` column is used instead if the

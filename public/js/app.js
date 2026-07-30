@@ -61,7 +61,10 @@ async function loadCourses() {
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
   else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
   if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
-  courses = courses.sort((a, b) => (b.priority === true) - (a.priority === true) || a.title.localeCompare(b.title));
+  courses = courses.sort((a, b) =>
+    (b.priority === true) - (a.priority === true) ||
+    Boolean(b.crn) - Boolean(a.crn) ||
+    a.title.localeCompare(b.title));
 
   loadStats(allCourses);
 
@@ -78,6 +81,7 @@ async function loadCourses() {
     if (isMine && c.status !== 'done') actions += `<button class="small" data-action="unclaim" data-id="${c.id}">Give back</button> `;
     return `<tr>
       <td>${escapeHtml(c.title)}</td>
+      <td class="muted">${escapeHtml(c.crn || '—')}</td>
       <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
       <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>

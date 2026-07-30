@@ -148,12 +148,16 @@ async function loadAdminCourses() {
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
   else if (userFilter) courses = courses.filter(c => c.assignedTo === Number(userFilter));
   if (categoryFilter) courses = courses.filter(c => c.category === categoryFilter);
-  courses = courses.sort((a, b) => (b.priority === true) - (a.priority === true) || a.title.localeCompare(b.title));
+  courses = courses.sort((a, b) =>
+    (b.priority === true) - (a.priority === true) ||
+    Boolean(b.crn) - Boolean(a.crn) ||
+    a.title.localeCompare(b.title));
 
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
     <tr>
       <td>${escapeHtml(c.title)}</td>
+      <td class="muted">${escapeHtml(c.crn || '—')}</td>
       <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
       <td>
         <select data-id="${c.id}" data-action="set-status">
@@ -287,8 +291,9 @@ document.getElementById('course-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const title = document.getElementById('course-title').value.trim();
   const category = document.getElementById('course-category').value.trim();
+  const crn = document.getElementById('course-crn').value.trim();
   try {
-    await api('/api/courses', { method: 'POST', body: JSON.stringify({ title, category }) });
+    await api('/api/courses', { method: 'POST', body: JSON.stringify({ title, category, crn }) });
     document.getElementById('course-form').reset();
     await loadAdminCourses();
   } catch (err) {

@@ -99,7 +99,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { title, category, notes } = req.body || {};
+  const { title, category, notes, crn } = req.body || {};
   if (!title || !String(title).trim()) {
     return res.status(400).json({ error: 'Course title is required' });
   }
@@ -107,6 +107,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     id: nextId('course'),
     title: String(title).trim(),
     category: category ? String(category).trim() : '',
+    crn: crn ? String(crn).trim() : '',
     status: 'not_started',
     priority: false,
     assignedTo: null,
@@ -140,6 +141,7 @@ const TITLE_KEY = ['title', 'course', 'course name', 'course title', 'name'];
 const STATUS_KEY = ['status', 'color', 'colour'];
 const CATEGORY_KEY = ['category', 'department', 'subject', 'program'];
 const INSTRUCTOR_KEY = ['instructor', 'faculty', 'teacher'];
+const CRN_KEY = ['crn', 'course reference number', 'section'];
 
 function findValue(fields, candidates) {
   for (const key of Object.keys(fields)) {
@@ -198,6 +200,7 @@ function importRecords(rows, res) {
       id: nextId('course'),
       title,
       category: (findValue(fields, CATEGORY_KEY) || '').trim(),
+      crn: (findValue(fields, CRN_KEY) || '').trim(),
       status,
       priority,
       assignedTo: null,
