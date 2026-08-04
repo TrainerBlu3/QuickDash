@@ -14,12 +14,16 @@ db.defaults({
   users: [],
   courses: [],
   activity: [],
+  issues: [],
   programColors: {}, // category/program name -> hex brand color
-  nextIds: { user: 1, course: 1, activity: 1 }
+  nextIds: { user: 1, course: 1, activity: 1, issue: 1 }
 }).write();
 
 function nextId(kind) {
-  const id = db.get(`nextIds.${kind}`).value();
+  // Falls back to 1 for a kind added after a db.json already existed, since
+  // lowdb's .defaults() only fills missing top-level keys, not ones nested
+  // inside an object (like nextIds) that's already present.
+  const id = db.get(`nextIds.${kind}`).value() || 1;
   db.set(`nextIds.${kind}`, id + 1).write();
   return id;
 }

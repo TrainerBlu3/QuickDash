@@ -8,6 +8,98 @@ function priorityBadge() {
   return `<span class="badge priority" title="Marked higher priority">★ Priority</span>`;
 }
 
+// Clickable warning badge shown next to a course that has open issues
+// reported against it — data-issues-id lets the row's click handler know
+// which course's issue dialog to open.
+function issuesBadge(course, openCount) {
+  if (!openCount) return '';
+  return `<span class="badge issue" data-issues-id="${course.id}" title="${openCount} open issue${openCount === 1 ? '' : 's'} reported — click for details">⚠ ${openCount} issue${openCount === 1 ? '' : 's'}</span>`;
+}
+
+// Shared "Issues" dialog: lists everything reported against one course and
+// lets anyone add a new report. When isAdmin is true, each issue also gets
+// resolve/reopen/remove controls. Both index.html and admin.html include
+// the same #issues-dialog markup so this one controller works for either
+// page — onChange is called after any write so the caller can refresh its
+// own course table (badge counts, etc).
+function initIssuesDialog({ isAdmin, onChange }) {
+  const dialog = document.getElementById('issues-dialog');
+  const titleEl = document.getElementById('issues-dialog-title');
+  const listEl = document.getElementById('issues-list');
+  const form = document.getElementById('issues-report-form');
+  const descInput = document.getElementById('issue-description');
+  let currentCourse = null;
+
+  function renderIssue(issue) {
+    const statusBadge = issue.status === 'resolved'
+      ? `<span class="badge done"><span class="dot"></span>Resolved</span>`
+      : `<span class="badge not_started"><span class="dot"></span>Open</span>`;
+    const adminControls = isAdmin ? `
+      <div class="row small" style="margin-top:6px;">
+        <button type="button" class="small" data-action="${issue.status === 'resolved' ? 'reopen' : 'resolve'}" data-id="${issue.id}">${issue.status === 'resolved' ? 'Reopen' : 'Resolve'}</button>
+        <button type="button" class="small" data-action="remove" data-id="${issue.id}">Remove</button>
+      </div>` : '';
+    return `
+      <div class="issue-item">
+        <div class="row spread">
+          <b>${escapeHtml(issue.reportedByName)}</b>
+          ${statusBadge}
+        </div>
+        <div>${escapeHtml(issue.description)}</div>
+        <div class="muted small">${fmtTime(issue.createdAt)}${issue.status === 'resolved' ? ` · resolved ${fmtTime(issue.resolvedAt)} by ${escapeHtml(issue.resolvedByName || '—')}` : ''}</div>
+        ${adminControls}
+      </div>`;
+  }
+
+  async function refresh() {
+    const issues = await api(`/api/issues?courseId=${currentCourse.id}`);
+    listEl.innerHTML = issues.length
+      ? issues.map(renderIssue).join('')
+      : '<p class="muted small">No issues reported for this course yet.</p>';
+    listEl.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.id);
+        try {
+          if (btn.dataset.action === 'resolve') await api(`/api/issues/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) });
+          if (btn.dataset.action === 'reopen') await api(`/api/issues/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'open' }) });
+          if (btn.dataset.action === 'remove') {
+            if (!confirm('Remove this issue? This cannot be undone.')) return;
+            await api(`/api/issues/${id}`, { method: 'DELETE' });
+          }
+          await refresh();
+          if (onChange) onChange();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api('/api/issues', { method: 'POST', body: JSON.stringify({ courseId: currentCourse.id, description: descInput.value.trim() }) });
+      descInput.value = '';
+      await refresh();
+      if (onChange) onChange();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  document.getElementById('issues-dialog-close').addEventListener('click', () => dialog.close());
+
+  return {
+    open(course) {
+      currentCourse = course;
+      titleEl.textContent = `Issues — ${course.title}`;
+      listEl.innerHTML = '<p class="muted small">Loading…</p>';
+      dialog.showModal();
+      refresh();
+    }
+  };
+}
+
 // A small color swatch for a course's category, if a brand color is set for it.
 function categorySwatch(category, programColors) {
   const color = programColors && programColors[category];

@@ -1,5 +1,6 @@
 let users = [];
 let programColors = {};
+let issuesDialog = null;
 const columnSort = createColumnSort(() => loadAdminCourses());
 
 // Named theme presets for the brand-color picker (quick-pick swatches).
@@ -30,10 +31,11 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['users', 'courses', 'colors', 'logs'].forEach(t => {
+    ['users', 'courses', 'colors', 'issues', 'logs'].forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t === btn.dataset.tab ? 'block' : 'none';
     });
     if (btn.dataset.tab === 'logs') loadLogs();
+    if (btn.dataset.tab === 'issues') loadIssueTracker();
   });
 });
 
@@ -154,7 +156,9 @@ async function loadAdminCourses() {
   const userFilter = document.getElementById('admin-filter-user').value;
   const categoryFilter = document.getElementById('admin-filter-category').value;
 
-  const allCourses = await api('/api/courses');
+  const [allCourses, openIssues] = await Promise.all([api('/api/courses'), api('/api/issues?status=open')]);
+  const openIssueCounts = {};
+  openIssues.forEach(i => { openIssueCounts[i.courseId] = (openIssueCounts[i.courseId] || 0) + 1; });
 
   const categories = [...new Set(allCourses.map(c => c.category).filter(Boolean))].sort();
   knownCategories = categories;
@@ -182,6 +186,7 @@ async function loadAdminCourses() {
           ${['not_started', 'in_progress', 'done'].map(s => `<option value="${s}" ${s === c.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
         </select>
         ${c.priority ? ' ' + priorityBadge() : ''}
+        ${' ' + issuesBadge(c, openIssueCounts[c.id])}
       </td>
       <td>
         <select data-id="${c.id}" data-action="assign">
@@ -191,11 +196,18 @@ async function loadAdminCourses() {
       </td>
       <td>
         <button class="small" data-id="${c.id}" data-action="toggle-priority">${c.priority ? 'Unmark priority' : 'Mark priority'}</button>
+        <button class="small" data-id="${c.id}" data-action="issues">⚠ Issues</button>
         <button class="small" data-id="${c.id}" data-action="delete">Delete</button>
       </td>
     </tr>
   `).join('');
   updateBulkBar();
+  tbody.querySelectorAll('button[data-action="issues"]').forEach(btn => {
+    btn.addEventListener('click', () => issuesDialog.open(allCourses.find(c => c.id === Number(btn.dataset.id))));
+  });
+  tbody.querySelectorAll('span[data-issues-id]').forEach(el => {
+    el.addEventListener('click', () => issuesDialog.open(allCourses.find(c => c.id === Number(el.dataset.issuesId))));
+  });
   tbody.querySelectorAll('input.course-select').forEach(cb => {
     cb.addEventListener('change', () => {
       const id = Number(cb.dataset.id);
@@ -416,6 +428,47 @@ document.getElementById('import-confirm-btn').addEventListener('click', async ()
   }
 });
 
+// ---- Issue tracker ----
+
+async function loadIssueTracker() {
+  const statusFilter = document.getElementById('issues-filter-status').value;
+  const issues = await api(statusFilter ? `/api/issues?status=${statusFilter}` : '/api/issues');
+  const tbody = document.getElementById('issue-tracker-rows');
+  document.getElementById('issue-tracker-empty').style.display = issues.length ? 'none' : 'block';
+  tbody.innerHTML = issues.map(i => `
+    <tr>
+      <td>${escapeHtml(i.courseTitle)}</td>
+      <td class="muted">${escapeHtml(i.reportedByName)}</td>
+      <td>${escapeHtml(i.description)}</td>
+      <td>${i.status === 'resolved' ? '<span class="badge done"><span class="dot"></span>Resolved</span>' : '<span class="badge not_started"><span class="dot"></span>Open</span>'}</td>
+      <td class="muted small">${fmtTime(i.createdAt)}</td>
+      <td>
+        <button class="small" data-id="${i.id}" data-action="${i.status === 'resolved' ? 'reopen' : 'resolve'}">${i.status === 'resolved' ? 'Reopen' : 'Resolve'}</button>
+        <button class="small" data-id="${i.id}" data-action="remove">Remove</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.dataset.id);
+      try {
+        if (btn.dataset.action === 'resolve') await api(`/api/issues/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) });
+        if (btn.dataset.action === 'reopen') await api(`/api/issues/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'open' }) });
+        if (btn.dataset.action === 'remove') {
+          if (!confirm('Remove this issue? This cannot be undone.')) return;
+          await api(`/api/issues/${id}`, { method: 'DELETE' });
+        }
+        await loadIssueTracker();
+        await loadAdminCourses();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+}
+
+document.getElementById('issues-filter-status').addEventListener('change', loadIssueTracker);
+
 // ---- Logs ----
 
 async function loadLogs() {
@@ -491,6 +544,7 @@ document.getElementById('bulk-category-btn').addEventListener('click', async () 
 
 (async function init() {
   await loadMe();
+  issuesDialog = initIssuesDialog({ isAdmin: true, onChange: loadAdminCourses });
   await loadUsers();
   await loadAdminCourses();
   await loadProgramColors();
@@ -499,5 +553,6 @@ document.getElementById('bulk-category-btn').addEventListener('click', async () 
     if (scopes.includes('courses')) loadAdminCourses().then(loadProgramColors);
     if (scopes.includes('activity')) loadLogs();
     if (scopes.includes('programColors')) loadProgramColors();
+    if (scopes.includes('issues')) { loadAdminCourses(); loadIssueTracker(); }
   });
 })();

@@ -87,6 +87,21 @@
   </div>
 </dialog>
 
+<dialog id="issues-dialog" style="border-radius:10px;border:1px solid var(--border);padding:0;max-width:480px;width:92%;">
+  <div class="card" style="margin:0;">
+    <h2 id="issues-dialog-title">Issues</h2>
+    <div id="issues-list"></div>
+    <h3 style="font-size:13px;color:var(--text-secondary);margin:16px 0 6px;">Report a new issue</h3>
+    <form id="issues-report-form" class="inline">
+      <input type="text" id="issue-description" placeholder="What's wrong with this course?" required style="flex:1;min-width:220px;">
+      <button type="submit" class="primary">Report</button>
+    </form>
+    <div class="row" style="margin-top:14px;">
+      <button type="button" id="issues-dialog-close">Close</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="/js/common.js"></script>
 <script src="/js/app.js"></script>
 </body>

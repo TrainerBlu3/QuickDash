@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const courseRoutes = require('./routes/courses');
 const activityRoutes = require('./routes/activity');
+const issueRoutes = require('./routes/issues');
 const eventRoutes = require('./routes/events');
 const programColorRoutes = require('./routes/programColors');
 const { requireAuth } = require('./middleware/auth');
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/issues', issueRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/program-colors', programColorRoutes);
 

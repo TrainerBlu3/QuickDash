@@ -28,6 +28,7 @@
     <button class="active" data-tab="users">Users &amp; logins</button>
     <button data-tab="courses">Courses</button>
     <button data-tab="colors">Brand colors</button>
+    <button data-tab="issues">Issues</button>
     <button data-tab="logs">All activity logs</button>
   </div>
 
@@ -145,6 +146,24 @@
     </div>
   </section>
 
+  <section id="tab-issues" style="display:none;">
+    <div class="card">
+      <div class="row spread">
+        <h2 style="margin:0;">Issue tracker</h2>
+        <select id="issues-filter-status">
+          <option value="open">Open</option>
+          <option value="resolved">Resolved</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr><th>Course</th><th>Reported by</th><th>Description</th><th>Status</th><th>Reported</th><th></th></tr></thead>
+        <tbody id="issue-tracker-rows"></tbody>
+      </table>
+      <p class="muted small" id="issue-tracker-empty" style="display:none;">No issues.</p>
+    </div>
+  </section>
+
   <section id="tab-logs" style="display:none;">
     <div class="card">
       <div class="row spread">
@@ -158,6 +177,21 @@
     </div>
   </section>
 </div>
+
+<dialog id="issues-dialog" style="border-radius:10px;border:1px solid var(--border);padding:0;max-width:480px;width:92%;">
+  <div class="card" style="margin:0;">
+    <h2 id="issues-dialog-title">Issues</h2>
+    <div id="issues-list"></div>
+    <h3 style="font-size:13px;color:var(--text-secondary);margin:16px 0 6px;">Report a new issue</h3>
+    <form id="issues-report-form" class="inline">
+      <input type="text" id="issue-description" placeholder="What's wrong with this course?" required style="flex:1;min-width:220px;">
+      <button type="submit" class="primary">Report</button>
+    </form>
+    <div class="row" style="margin-top:14px;">
+      <button type="button" id="issues-dialog-close">Close</button>
+    </div>
+  </div>
+</dialog>
 
 <script src="/js/common.js"></script>
 <script src="/js/admin.js"></script>

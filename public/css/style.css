@@ -160,6 +160,10 @@ tbody tr:hover { background: var(--page-plane); }
 .badge.done { background: var(--status-good-bg); color: var(--status-good); }
 .badge.done .dot { background: var(--status-good); }
 .badge.priority { background: var(--priority-bg); color: var(--priority); }
+.badge.issue { background: var(--status-critical-bg); color: var(--status-critical); cursor: pointer; border: none; }
+
+.issue-item { padding: 10px 0; border-bottom: 1px solid var(--gridline); font-size: 13px; }
+.issue-item:last-child { border-bottom: none; }
 
 button, .btn {
   font-family: inherit;

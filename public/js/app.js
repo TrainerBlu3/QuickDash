@@ -1,6 +1,7 @@
 let me = null;
 let programColors = {};
 let allUsers = [];
+let issuesDialog = null;
 const columnSort = createColumnSort(() => loadCourses());
 
 async function loadProgramColors() {
@@ -55,8 +56,11 @@ async function loadCourses() {
   const userFilter = document.getElementById('filter-user').value;
   const categoryFilter = document.getElementById('filter-category').value;
 
-  const allCourses = await api('/api/courses');
+  const [allCourses, openIssues] = await Promise.all([api('/api/courses'), api('/api/issues?status=open')]);
   refreshCategoryFilter(allCourses);
+
+  const openIssueCounts = {};
+  openIssues.forEach(i => { openIssueCounts[i.courseId] = (openIssueCounts[i.courseId] || 0) + 1; });
 
   let courses = showDone ? allCourses : allCourses.filter(c => c.status !== 'done');
   if (userFilter === 'unassigned') courses = courses.filter(c => !c.assignedTo);
@@ -77,18 +81,26 @@ async function loadCourses() {
     if (canAdvance && c.status === 'not_started') actions += `<button class="small primary" data-action="start" data-id="${c.id}">Start</button> `;
     if (canAdvance && c.status === 'in_progress') actions += `<button class="small primary" data-action="finish" data-id="${c.id}">Mark done</button> `;
     if (isMine && c.status !== 'done') actions += `<button class="small" data-action="unclaim" data-id="${c.id}">Give back</button> `;
+    actions += `<button class="small" data-action="issues" data-id="${c.id}">⚠ Issues</button>`;
     return `<tr>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.crn || '—')}</td>
       <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>
-      <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}</td>
+      <td>${badge(c.status)}${c.priority ? ' ' + priorityBadge() : ''}${' ' + issuesBadge(c, openIssueCounts[c.id])}</td>
       <td class="muted">${c.assignedToName ? escapeHtml(c.assignedToName) : '—'}</td>
       <td>${actions}</td>
     </tr>`;
   }).join('');
 
   tbody.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => handleCourseAction(btn.dataset.action, Number(btn.dataset.id)));
+    if (btn.dataset.action === 'issues') {
+      btn.addEventListener('click', () => issuesDialog.open(allCourses.find(c => c.id === Number(btn.dataset.id))));
+    } else {
+      btn.addEventListener('click', () => handleCourseAction(btn.dataset.action, Number(btn.dataset.id)));
+    }
+  });
+  tbody.querySelectorAll('span[data-issues-id]').forEach(el => {
+    el.addEventListener('click', () => issuesDialog.open(allCourses.find(c => c.id === Number(el.dataset.issuesId))));
   });
 }
 
@@ -152,6 +164,7 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
 
 (async function init() {
   await loadMe();
+  issuesDialog = initIssuesDialog({ isAdmin: me.role === 'admin', onChange: loadCourses });
   await loadProgramColors();
   await loadUsersList();
   await loadCourses();
@@ -161,5 +174,6 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
     if (scopes.includes('activity')) loadLog();
     if (scopes.includes('users')) loadUsersList();
     if (scopes.includes('programColors')) loadProgramColors().then(loadCourses);
+    if (scopes.includes('issues')) loadCourses();
   });
 })();
