@@ -82,7 +82,7 @@ async function loadCourses() {
     if (canAdvance && c.status === 'in_progress') actions += `<button class="small primary" data-action="finish" data-id="${c.id}">Mark done</button> `;
     if (isMine && c.status !== 'done') actions += `<button class="small" data-action="unclaim" data-id="${c.id}">Give back</button> `;
     actions += `<button class="small" data-action="issues" data-id="${c.id}">⚠ Issues</button>`;
-    return `<tr>
+    return `<tr${openIssueCounts[c.id] ? ' class="has-issue"' : ''}>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.crn || '—')}</td>
       <td class="muted">${categorySwatch(c.category, programColors)}${escapeHtml(c.category || '—')}</td>

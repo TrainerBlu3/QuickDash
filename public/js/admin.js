@@ -176,7 +176,7 @@ async function loadAdminCourses() {
 
   const tbody = document.getElementById('admin-course-rows');
   tbody.innerHTML = courses.map(c => `
-    <tr>
+    <tr${openIssueCounts[c.id] ? ' class="has-issue"' : ''}>
       <td><input type="checkbox" class="course-select" data-id="${c.id}" ${selectedCourseIds.has(c.id) ? 'checked' : ''}></td>
       <td>${escapeHtml(c.title)}</td>
       <td class="muted">${escapeHtml(c.crn || '—')}</td>
