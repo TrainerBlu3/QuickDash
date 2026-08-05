@@ -16,7 +16,10 @@ db.defaults({
   activity: [],
   issues: [],
   programColors: {}, // category/program name -> hex brand color
-  nextIds: { user: 1, course: 1, activity: 1, issue: 1 }
+  boards: [], // not yet wired into routes — see meta.defaultBoardId below
+  boardMembers: [], // { boardId, userId } — who can see/use a board
+  nextIds: { user: 1, course: 1, activity: 1, issue: 1, board: 1 },
+  meta: { defaultBoardId: null }
 }).write();
 
 function nextId(kind) {
@@ -27,6 +30,34 @@ function nextId(kind) {
   db.set(`nextIds.${kind}`, id + 1).write();
   return id;
 }
+
+// Seeds a "Courses" board (mirroring today's fixed category/crn fields) and
+// gives every existing user membership on it, so the upcoming board-scoped
+// routes have somewhere to land. Routes still read/write the flat `courses`
+// collection directly for now — this is purely additive groundwork, not a
+// migration of the data itself yet.
+function ensureDefaultBoard() {
+  if (db.get('meta.defaultBoardId').value()) return;
+
+  const board = {
+    id: nextId('board'),
+    name: 'Courses',
+    itemLabel: 'course',
+    fields: [
+      { key: 'category', label: 'Category', type: 'select' },
+      { key: 'crn', label: 'CRN', type: 'text' }
+    ],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  db.get('boards').push(board).write();
+  db.set('meta.defaultBoardId', board.id).write();
+
+  db.get('users').value().forEach(u => {
+    db.get('boardMembers').push({ boardId: board.id, userId: u.id }).write();
+  });
+}
+ensureDefaultBoard();
 
 // Seed a default admin account on first run so there's always a way in.
 if (db.get('users').size().value() === 0) {
