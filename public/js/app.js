@@ -2,6 +2,7 @@ let me = null;
 let programColors = {};
 let allUsers = [];
 let issuesDialog = null;
+let defaultUserFilterApplied = false;
 const columnSort = createColumnSort(() => loadCourses());
 
 async function loadProgramColors() {
@@ -12,9 +13,18 @@ async function loadUsersList() {
   allUsers = await api('/api/users/list');
   const select = document.getElementById('filter-user');
   const current = select.value;
-  select.innerHTML = '<option value="">All users</option><option value="unassigned">Unassigned</option>'
-    + allUsers.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+  select.innerHTML = '<option value="">All courses</option><option value="unassigned">Unassigned</option>'
+    + allUsers.map(u => `<option value="${u.id}">${u.id === me.id ? 'My courses' : escapeHtml(u.name)}</option>`).join('');
   select.value = current;
+
+  // Non-admins land on their own courses by default (fewer than an admin
+  // would see, and the common case for someone just working their queue) —
+  // but only on first load, so switching to "All courses" afterward sticks
+  // across re-renders and live updates instead of snapping back.
+  if (!defaultUserFilterApplied && me.role !== 'admin') {
+    select.value = String(me.id);
+    defaultUserFilterApplied = true;
+  }
 }
 
 // Rebuilds the category filter's options from whatever categories are
