@@ -542,6 +542,20 @@ document.getElementById('bulk-category-btn').addEventListener('click', async () 
   }
 });
 
+document.getElementById('bulk-delete-btn').addEventListener('click', async () => {
+  const ids = [...selectedCourseIds];
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} course${ids.length === 1 ? '' : 's'}? This does not delete their activity history. This cannot be undone.`)) return;
+  try {
+    await api('/api/courses/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) });
+    selectedCourseIds.clear();
+    document.getElementById('select-all-courses').checked = false;
+    await loadAdminCourses();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
 (async function init() {
   await loadMe();
   issuesDialog = initIssuesDialog({ isAdmin: true, onChange: loadAdminCourses });

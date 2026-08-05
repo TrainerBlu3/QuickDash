@@ -291,7 +291,10 @@ function importRecords(rows, res, { replace = false } = {}) {
   let removed = 0;
   if (replace) {
     const toRemove = db.get('courses').value().filter(c => !seenTitles.has(c.title.trim().toLowerCase()));
-    toRemove.forEach(c => db.get('courses').remove({ id: c.id }).write());
+    toRemove.forEach(c => {
+      db.get('courses').remove({ id: c.id }).write();
+      db.get('issues').remove({ courseId: c.id }).write();
+    });
     removed = toRemove.length;
   }
 
@@ -371,6 +374,26 @@ router.patch('/bulk', requireAuth, requireAdmin, (req, res) => {
 
   if (updated > 0) broadcast(['courses', 'activity']);
   res.json({ updated });
+});
+
+// Registered ahead of DELETE /:id so "bulk" isn't swallowed as an :id value.
+router.delete('/bulk', requireAuth, requireAdmin, (req, res) => {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids) || !ids.length) {
+    return res.status(400).json({ error: 'ids must be a non-empty array of course IDs' });
+  }
+
+  let removed = 0;
+  for (const rawId of ids) {
+    const course = db.get('courses').find({ id: Number(rawId) }).value();
+    if (!course) continue;
+    db.get('courses').remove({ id: course.id }).write();
+    db.get('issues').remove({ courseId: course.id }).write();
+    removed += 1;
+  }
+
+  if (removed > 0) broadcast(['courses', 'issues']);
+  res.json({ removed });
 });
 
 router.patch('/:id', requireAuth, (req, res) => {
@@ -496,7 +519,8 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
   db.get('courses').remove({ id: course.id }).write();
-  broadcast('courses');
+  db.get('issues').remove({ courseId: course.id }).write();
+  broadcast(['courses', 'issues']);
   res.json({ ok: true });
 });
 
