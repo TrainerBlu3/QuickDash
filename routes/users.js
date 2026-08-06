@@ -8,8 +8,10 @@ const { broadcast } = require('../events');
 const router = express.Router();
 
 function generatePassword() {
-  // 10 random bytes -> readable base32-ish password, e.g. "K7QF3H9PLM"
-  return crypto.randomBytes(8).toString('hex').slice(0, 10);
+  // 16 random bytes -> 32 hex chars (128 bits of entropy). Single-use and
+  // forced-change on first login, but no reason to leave it weaker than
+  // the change-password minimum by using a truncated slice.
+  return crypto.randomBytes(16).toString('hex');
 }
 
 function publicUser(u) {

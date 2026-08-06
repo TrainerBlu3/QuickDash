@@ -4,7 +4,7 @@ const { parse } = require('csv-parse/sync');
 const XlsxPopulate = require('xlsx-populate');
 const { loadThemeColors, classifyRow } = require('../colorClassify');
 const { db, nextId } = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireCoursesAccess } = require('../middleware/auth');
 const { broadcast } = require('../events');
 
 const router = express.Router();
@@ -89,7 +89,7 @@ function normalizeStatus(raw) {
   return COLOR_TO_STATUS[key] || 'not_started';
 }
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, requireCoursesAccess, (req, res) => {
   let courses = db.get('courses').value();
   if (req.query.status) {
     const wanted = String(req.query.status).split(',');
@@ -98,7 +98,7 @@ router.get('/', requireAuth, (req, res) => {
   res.json(courses);
 });
 
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const { title, category, notes, crn } = req.body || {};
   if (!title || !String(title).trim()) {
     return res.status(400).json({ error: 'Course title is required' });
@@ -121,7 +121,7 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
   res.status(201).json(course);
 });
 
-router.post('/import', requireAuth, requireAdmin, (req, res) => {
+router.post('/import', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   upload.single('file')(req, res, async (uploadErr) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
     if (!req.file) return res.status(400).json({ error: 'A CSV or Excel file is required (field name "file")' });
@@ -149,7 +149,7 @@ router.post('/import', requireAuth, requireAdmin, (req, res) => {
 // Parses the file and reports what each row would resolve to, without
 // writing anything — lets the admin see where the real data ends (e.g.
 // trailing notes rows) and choose a cutoff before committing to /import.
-router.post('/import/preview', requireAuth, requireAdmin, (req, res) => {
+router.post('/import/preview', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   upload.single('file')(req, res, async (uploadErr) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
     if (!req.file) return res.status(400).json({ error: 'A CSV or Excel file is required (field name "file")' });
@@ -314,7 +314,7 @@ function importRecords(rows, res, { replace = false } = {}) {
 // Applies assignTo and/or category to a set of courses in one request, for
 // cleaning up many rows at once (e.g. consolidating messy category
 // spellings, or handing a batch of courses to one person).
-router.patch('/bulk', requireAuth, requireAdmin, (req, res) => {
+router.patch('/bulk', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const { ids, assignTo, category } = req.body || {};
   if (!Array.isArray(ids) || !ids.length) {
     return res.status(400).json({ error: 'ids must be a non-empty array of course IDs' });
@@ -377,7 +377,7 @@ router.patch('/bulk', requireAuth, requireAdmin, (req, res) => {
 });
 
 // Registered ahead of DELETE /:id so "bulk" isn't swallowed as an :id value.
-router.delete('/bulk', requireAuth, requireAdmin, (req, res) => {
+router.delete('/bulk', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const { ids } = req.body || {};
   if (!Array.isArray(ids) || !ids.length) {
     return res.status(400).json({ error: 'ids must be a non-empty array of course IDs' });
@@ -396,7 +396,7 @@ router.delete('/bulk', requireAuth, requireAdmin, (req, res) => {
   res.json({ removed });
 });
 
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, requireCoursesAccess, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
@@ -515,7 +515,7 @@ router.patch('/:id', requireAuth, (req, res) => {
   res.json(db.get('courses').find({ id: course.id }).value());
 });
 
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
   db.get('courses').remove({ id: course.id }).write();

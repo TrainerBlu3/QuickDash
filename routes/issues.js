@@ -1,6 +1,6 @@
 const express = require('express');
 const { db, nextId } = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireCoursesAccess } = require('../middleware/auth');
 const { broadcast } = require('../events');
 
 const router = express.Router();
@@ -22,7 +22,7 @@ function logActivity({ userId, username, courseId, courseTitle, action, notes })
   }).write();
 }
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, requireCoursesAccess, (req, res) => {
   let issues = db.get('issues').value();
   if (req.query.courseId) issues = issues.filter(i => i.courseId === Number(req.query.courseId));
   if (req.query.status) issues = issues.filter(i => i.status === req.query.status);
@@ -33,7 +33,7 @@ router.get('/', requireAuth, (req, res) => {
 // Any signed-in user can flag a problem with a course — not just its
 // current assignee — since the point is that everyone else sees it too,
 // including after the reporter has already handed the course back.
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, requireCoursesAccess, (req, res) => {
   const { courseId, description } = req.body || {};
   const course = db.get('courses').find({ id: Number(courseId) }).value();
   if (!course) return res.status(400).json({ error: 'Course not found' });
@@ -67,7 +67,7 @@ router.post('/', requireAuth, (req, res) => {
   res.status(201).json(issue);
 });
 
-router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
+router.patch('/:id', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const issue = db.get('issues').find({ id: Number(req.params.id) }).value();
   if (!issue) return res.status(404).json({ error: 'Issue not found' });
 
@@ -113,7 +113,7 @@ router.patch('/:id', requireAuth, requireAdmin, (req, res) => {
   res.json(db.get('issues').find({ id: issue.id }).value());
 });
 
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requireCoursesAccess, requireAdmin, (req, res) => {
   const issue = db.get('issues').find({ id: Number(req.params.id) }).value();
   if (!issue) return res.status(404).json({ error: 'Issue not found' });
 

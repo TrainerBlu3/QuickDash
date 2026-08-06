@@ -1,13 +1,13 @@
 const express = require('express');
 const { db } = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireCoursesAccess } = require('../middleware/auth');
 const { broadcast } = require('../events');
 
 const router = express.Router();
 
 const HEX_RE = /^#?[0-9A-Fa-f]{6}$/;
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, requireCoursesAccess, (req, res) => {
   res.json(db.get('programColors').value());
 });
 

@@ -5,7 +5,39 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// In-memory brute-force throttle, keyed by client IP: no external store
+// needed for a small internal tool on a single instance. Failed attempts
+// within the window count toward the limit; a successful login clears
+// them. Resets on process restart, which is an acceptable trade-off here.
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
+const loginAttempts = new Map(); // ip -> { count, windowStart }
+
+function isRateLimited(ip) {
+  const entry = loginAttempts.get(ip);
+  if (!entry) return false;
+  if (Date.now() - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return entry.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordFailedAttempt(ip) {
+  const entry = loginAttempts.get(ip);
+  if (!entry || Date.now() - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, windowStart: Date.now() });
+  } else {
+    entry.count += 1;
+  }
+}
+
 router.post('/login', (req, res) => {
+  if (isRateLimited(req.ip)) {
+    res.setHeader('Retry-After', String(Math.ceil(LOGIN_WINDOW_MS / 1000)));
+    return res.status(429).json({ error: 'Too many login attempts. Try again in a few minutes.' });
+  }
+
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
@@ -15,8 +47,10 @@ router.post('/login', (req, res) => {
     .value();
 
   if (!user || !user.active || !bcrypt.compareSync(password, user.passwordHash)) {
+    recordFailedAttempt(req.ip);
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+  loginAttempts.delete(req.ip);
 
   req.session.userId = user.id;
   req.session.username = user.username;
