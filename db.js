@@ -16,9 +16,10 @@ db.defaults({
   activity: [],
   issues: [],
   programColors: {}, // category/program name -> hex brand color
-  boards: [], // not yet wired into routes — see meta.defaultBoardId below
+  boards: [],
   boardMembers: [], // { boardId, userId } — who can see/use a board
-  nextIds: { user: 1, course: 1, activity: 1, issue: 1, board: 1 },
+  items: [], // generic board-scoped items (e.g. support tickets) — see routes/boards.js
+  nextIds: { user: 1, course: 1, activity: 1, issue: 1, board: 1, item: 1 },
   meta: { defaultBoardId: null }
 }).write();
 
@@ -58,6 +59,33 @@ function ensureDefaultBoard() {
   });
 }
 ensureDefaultBoard();
+
+// Seeds a "Tickets" board for IT/course-dashboard support requests: a TA or
+// admin logs a ticket on a teacher's behalf, then TAs claim it (status
+// auto-advances to "claimed") so context is ready before the teacher
+// arrives, and resolve it once handled. Membership starts empty — unlike
+// Courses, existing users are not grandfathered in; an admin adds TAs via
+// the Boards tab. Guarded on itemLabel rather than meta.defaultBoardId,
+// which stays reserved for the Courses board.
+function ensureTicketsBoard() {
+  if (db.get('boards').find({ itemLabel: 'ticket' }).value()) return;
+
+  const board = {
+    id: nextId('board'),
+    name: 'Tickets',
+    itemLabel: 'ticket',
+    fields: [
+      { key: 'teacherName', label: 'Teacher', type: 'text' },
+      { key: 'description', label: 'What they need', type: 'text' }
+    ],
+    statuses: ['open', 'claimed', 'resolved'],
+    claimTargetStatus: 'claimed',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  db.get('boards').push(board).write();
+}
+ensureTicketsBoard();
 
 // Seed a default admin account on first run so there's always a way in.
 if (db.get('users').size().value() === 0) {

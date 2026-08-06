@@ -5,6 +5,61 @@ let issuesDialog = null;
 let defaultUserFilterApplied = false;
 const columnSort = createColumnSort(() => loadCourses());
 
+let boards = [];
+let currentBoardId = 'courses'; // 'courses' or a board.id
+const boardViews = {}; // board.id -> { refresh() }, lazily initialized
+
+// Coursework stays a first-class tab alongside any board the user belongs
+// to. The switcher only shows once there's an actual choice to make (a
+// solo Courses-only user sees no change at all from before this feature).
+async function loadBoards() {
+  // GET /api/boards also returns the legacy "Courses" board descriptor
+  // (itemLabel 'course') since it's grandfathered membership for every
+  // user — filter it out here since the Courses tab below is hardcoded
+  // and still backed by /api/courses, not the generic items endpoint.
+  boards = (await api('/api/boards')).filter(b => b.itemLabel !== 'course');
+  const tabsEl = document.getElementById('board-tabs');
+  if (boards.length < 1) { tabsEl.style.display = 'none'; return; }
+
+  tabsEl.style.display = 'flex';
+  const tabs = [{ id: 'courses', name: 'Courses' }, ...boards.map(b => ({ id: b.id, name: b.name }))];
+  tabsEl.innerHTML = tabs.map(t => `<button data-board="${t.id}" class="${String(t.id) === String(currentBoardId) ? 'active' : ''}">${escapeHtml(t.name)}</button>`).join('');
+  tabsEl.querySelectorAll('button[data-board]').forEach(btn => {
+    btn.addEventListener('click', () => switchBoard(btn.dataset.board === 'courses' ? 'courses' : Number(btn.dataset.board)));
+  });
+}
+
+function switchBoard(boardId) {
+  currentBoardId = boardId;
+  document.querySelectorAll('#board-tabs button[data-board]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.board === String(boardId));
+  });
+  document.getElementById('board-courses').style.display = boardId === 'courses' ? 'block' : 'none';
+  document.getElementById('board-generic').style.display = boardId === 'courses' ? 'none' : 'block';
+  if (boardId === 'courses') return;
+
+  const board = boards.find(b => b.id === boardId);
+  document.getElementById('board-generic-title').textContent = board.name;
+  if (boardViews[boardId]) {
+    boardViews[boardId].refresh();
+  } else {
+    boardViews[boardId] = initBoardView({
+      board,
+      isAdmin: me.role === 'admin',
+      me,
+      containerIds: {
+        theadRow: 'board-generic-thead',
+        tbody: 'board-generic-rows',
+        empty: 'board-generic-empty',
+        form: 'board-generic-form',
+        formFields: 'board-generic-form-fields',
+        submitBtn: 'board-generic-submit'
+      },
+      onChange: loadLog
+    });
+  }
+}
+
 async function loadProgramColors() {
   programColors = await api('/api/program-colors');
 }
@@ -134,9 +189,9 @@ async function loadLog() {
   tbody.innerHTML = entries.map(e => `
     <tr>
       <td class="muted small">${fmtTime(e.timestamp)}</td>
-      <td>${escapeHtml(e.courseTitle)}</td>
+      <td>${escapeHtml(e.courseTitle || e.itemTitle || '—')}</td>
       <td>${escapeHtml(e.action.replace('_', ' '))}</td>
-      <td>${e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus ? `${STATUS_LABEL[e.fromStatus]} → ${STATUS_LABEL[e.toStatus]}` : '—'}</td>
+      <td>${e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus ? `${STATUS_LABEL[e.fromStatus] || e.fromStatus} → ${STATUS_LABEL[e.toStatus] || e.toStatus}` : '—'}</td>
       <td class="muted small">${escapeHtml(e.notes || '—')}</td>
     </tr>
   `).join('');
@@ -179,11 +234,16 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
   await loadUsersList();
   await loadCourses();
   await loadLog();
+  await loadBoards();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('courses')) loadCourses();
     if (scopes.includes('activity')) loadLog();
     if (scopes.includes('users')) loadUsersList();
     if (scopes.includes('programColors')) loadProgramColors().then(loadCourses);
     if (scopes.includes('issues')) loadCourses();
+    if (scopes.includes('boardMembers')) loadBoards();
+    if (typeof currentBoardId === 'number' && scopes.includes(`items:${currentBoardId}`) && boardViews[currentBoardId]) {
+      boardViews[currentBoardId].refresh();
+    }
   });
 })();

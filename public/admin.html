@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QuickDash — Admin</title>
 <link rel="stylesheet" href="/css/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+// Preflight is disabled so Tailwind only supplies utility classes on the
+// new board/ticket markup — it never resets the existing hand-written
+// button/input/table styles used by the rest of the app.
+tailwind.config = { corePlugins: { preflight: false } };
+</script>
 <script>
 (function () {
   var t = localStorage.getItem('quickdash-theme');
@@ -24,11 +31,12 @@
 </div>
 
 <div class="container">
-  <div class="tabs">
+  <div class="tabs flex flex-wrap">
     <button class="active" data-tab="users">Users &amp; logins</button>
     <button data-tab="courses">Courses</button>
     <button data-tab="colors">Brand colors</button>
     <button data-tab="issues">Issues</button>
+    <button data-tab="boards">Boards</button>
     <button data-tab="logs">All activity logs</button>
   </div>
 
@@ -163,6 +171,10 @@
       </table>
       <p class="muted small" id="issue-tracker-empty" style="display:none;">No issues.</p>
     </div>
+  </section>
+
+  <section id="tab-boards" style="display:none;">
+    <div id="boards-list"></div>
   </section>
 
   <section id="tab-logs" style="display:none;">

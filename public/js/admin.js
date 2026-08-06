@@ -31,11 +31,12 @@ document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['users', 'courses', 'colors', 'issues', 'logs'].forEach(t => {
+    ['users', 'courses', 'colors', 'issues', 'boards', 'logs'].forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t === btn.dataset.tab ? 'block' : 'none';
     });
     if (btn.dataset.tab === 'logs') loadLogs();
     if (btn.dataset.tab === 'issues') loadIssueTracker();
+    if (btn.dataset.tab === 'boards') loadBoardsAdmin();
   });
 });
 
@@ -469,6 +470,85 @@ async function loadIssueTracker() {
 
 document.getElementById('issues-filter-status').addEventListener('change', loadIssueTracker);
 
+// ---- Boards ----
+
+// Membership management for generic boards (e.g. Tickets). The legacy
+// Courses board descriptor (itemLabel 'course') is excluded — its
+// membership is grandfathered and unused by any route, so there's nothing
+// meaningful to manage for it here.
+async function loadBoardsAdmin() {
+  const allBoards = (await api('/api/boards')).filter(b => b.itemLabel !== 'course');
+  const container = document.getElementById('boards-list');
+
+  if (!allBoards.length) {
+    container.innerHTML = '<p class="muted small">No boards yet besides Courses.</p>';
+    return;
+  }
+
+  const membersByBoard = {};
+  await Promise.all(allBoards.map(async b => {
+    membersByBoard[b.id] = await api(`/api/boards/${b.id}/members`);
+  }));
+
+  container.innerHTML = allBoards.map(b => {
+    const members = membersByBoard[b.id];
+    const memberIds = new Set(members.map(m => m.userId));
+    const candidates = users.filter(u => u.active && !memberIds.has(u.id));
+    return `
+      <div class="card">
+        <h2>${escapeHtml(b.name)} <span class="muted small">(${escapeHtml(b.itemLabel)}s)</span></h2>
+        <div class="overflow-x-auto">
+          <table>
+            <thead><tr><th>Name</th><th>Username</th><th></th></tr></thead>
+            <tbody>
+              ${members.length ? members.map(m => `
+                <tr>
+                  <td>${escapeHtml(m.name)}</td>
+                  <td class="muted">${escapeHtml(m.username || '—')}</td>
+                  <td><button class="small whitespace-nowrap" data-action="remove-member" data-board="${b.id}" data-user="${m.userId}">Remove</button></td>
+                </tr>
+              `).join('') : '<tr><td colspan="3" class="muted small">No members yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div class="row small flex flex-wrap gap-2" style="margin-top:12px;">
+          <select data-add-member-select="${b.id}">
+            <option value="" disabled selected>Add a member…</option>
+            ${candidates.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('')}
+          </select>
+          <button type="button" class="small whitespace-nowrap" data-action="add-member" data-board="${b.id}">Add</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('button[data-action="remove-member"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api(`/api/boards/${btn.dataset.board}/members/${btn.dataset.user}`, { method: 'DELETE' });
+        await loadBoardsAdmin();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+
+  container.querySelectorAll('button[data-action="add-member"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const select = container.querySelector(`select[data-add-member-select="${btn.dataset.board}"]`);
+      if (!select.value) return;
+      try {
+        await api(`/api/boards/${btn.dataset.board}/members`, {
+          method: 'POST',
+          body: JSON.stringify({ userId: Number(select.value) })
+        });
+        await loadBoardsAdmin();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+}
+
 // ---- Logs ----
 
 async function loadLogs() {
@@ -479,9 +559,9 @@ async function loadLogs() {
     <tr>
       <td class="muted small">${fmtTime(e.timestamp)}</td>
       <td>${escapeHtml(e.username)}</td>
-      <td>${escapeHtml(e.courseTitle)}</td>
+      <td>${escapeHtml(e.courseTitle || e.itemTitle || '—')}</td>
       <td>${escapeHtml(e.action.replace('_', ' '))}</td>
-      <td>${e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus ? `${STATUS_LABEL[e.fromStatus]} → ${STATUS_LABEL[e.toStatus]}` : '—'}</td>
+      <td>${e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus ? `${STATUS_LABEL[e.fromStatus] || e.fromStatus} → ${STATUS_LABEL[e.toStatus] || e.toStatus}` : '—'}</td>
       <td class="muted small">${escapeHtml(e.notes || '—')}</td>
     </tr>
   `).join('');
@@ -568,5 +648,6 @@ document.getElementById('bulk-delete-btn').addEventListener('click', async () =>
     if (scopes.includes('activity')) loadLogs();
     if (scopes.includes('programColors')) loadProgramColors();
     if (scopes.includes('issues')) { loadAdminCourses(); loadIssueTracker(); }
+    if (scopes.includes('boardMembers') && document.getElementById('tab-boards').style.display !== 'none') loadBoardsAdmin();
   });
 })();

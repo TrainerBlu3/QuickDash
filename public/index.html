@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QuickDash — Dashboard</title>
 <link rel="stylesheet" href="/css/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+// Preflight is disabled so Tailwind only supplies utility classes on the
+// new board/ticket markup — it never resets the existing hand-written
+// button/input/table styles used by the rest of the app.
+tailwind.config = { corePlugins: { preflight: false } };
+</script>
 <script>
 (function () {
   var t = localStorage.getItem('quickdash-theme');
@@ -30,42 +37,67 @@
     You're using a temporary password. <a href="#" id="pw-warning-link">Change it now.</a>
   </div>
 
-  <div class="stat-row" id="stat-row"></div>
+  <div class="tabs flex flex-wrap" id="board-tabs" style="display:none;"></div>
 
-  <div class="card">
-    <div class="row spread">
-      <h2 style="margin:0;">Courses yet to be done</h2>
-      <label class="row small">
-        <input type="checkbox" id="show-done"> show completed too
-      </label>
+  <div id="board-courses">
+    <div class="stat-row" id="stat-row"></div>
+
+    <div class="card">
+      <div class="row spread">
+        <h2 style="margin:0;">Courses yet to be done</h2>
+        <label class="row small">
+          <input type="checkbox" id="show-done"> show completed too
+        </label>
+      </div>
+      <div class="row" style="margin-bottom:14px;">
+        <select id="filter-user"><option value="">All users</option></select>
+        <select id="filter-category"><option value="">All categories</option></select>
+      </div>
+      <div class="overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="title">Course<span class="sort-arrow"></span></th>
+              <th data-sort="crn">CRN<span class="sort-arrow"></span></th>
+              <th data-sort="category">Category<span class="sort-arrow"></span></th>
+              <th data-sort="status">Status<span class="sort-arrow"></span></th>
+              <th data-sort="assignedToName">Assigned to<span class="sort-arrow"></span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="course-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="empty-state" style="display:none;">Nothing left to redesign 🎉</p>
     </div>
-    <div class="row" style="margin-bottom:14px;">
-      <select id="filter-user"><option value="">All users</option></select>
-      <select id="filter-category"><option value="">All categories</option></select>
+
+    <div class="card">
+      <h2>My activity log</h2>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>When</th><th>Course</th><th>Action</th><th>Change</th><th>Notes</th></tr></thead>
+          <tbody id="log-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="log-empty" style="display:none;">No activity logged yet.</p>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th data-sort="title">Course<span class="sort-arrow"></span></th>
-          <th data-sort="crn">CRN<span class="sort-arrow"></span></th>
-          <th data-sort="category">Category<span class="sort-arrow"></span></th>
-          <th data-sort="status">Status<span class="sort-arrow"></span></th>
-          <th data-sort="assignedToName">Assigned to<span class="sort-arrow"></span></th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="course-rows"></tbody>
-    </table>
-    <p class="muted small" id="empty-state" style="display:none;">Nothing left to redesign 🎉</p>
   </div>
 
-  <div class="card">
-    <h2>My activity log</h2>
-    <table>
-      <thead><tr><th>When</th><th>Course</th><th>Action</th><th>Change</th><th>Notes</th></tr></thead>
-      <tbody id="log-rows"></tbody>
-    </table>
-    <p class="muted small" id="log-empty" style="display:none;">No activity logged yet.</p>
+  <div id="board-generic" style="display:none;">
+    <div class="card">
+      <h2 id="board-generic-title">Board</h2>
+      <form id="board-generic-form" class="flex flex-wrap items-start gap-2 mb-4">
+        <div id="board-generic-form-fields" class="flex flex-wrap gap-2 flex-1"></div>
+        <button type="submit" class="primary whitespace-nowrap" id="board-generic-submit">Log item</button>
+      </form>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr id="board-generic-thead"></tr></thead>
+          <tbody id="board-generic-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="board-generic-empty" style="display:none;">Nothing here yet.</p>
+    </div>
   </div>
 
 </div>

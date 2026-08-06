@@ -100,6 +100,111 @@ function initIssuesDialog({ isAdmin, onChange }) {
   };
 }
 
+// Generic board-item view: builds a table + create form for any board's
+// items from board.fields/board.statuses metadata, instead of hardcoded
+// course columns. Mirrors the claim/unclaim/advance UX of app.js's
+// loadCourses(), but status-list-driven — the same controller works for
+// Tickets today and any future board without another rewrite. Both
+// containerIds.thead/tbody/empty/form/formFields/submitBtn must already
+// exist in the calling page's markup.
+function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
+  const theadRow = document.getElementById(containerIds.theadRow);
+  const tbody = document.getElementById(containerIds.tbody);
+  const emptyEl = document.getElementById(containerIds.empty);
+  const form = document.getElementById(containerIds.form);
+  const formFieldsEl = document.getElementById(containerIds.formFields);
+  const submitBtn = document.getElementById(containerIds.submitBtn);
+
+  const initialStatus = board.statuses[0];
+  const terminalStatus = board.statuses[board.statuses.length - 1];
+
+  function statusBadgeClass(status) {
+    if (status === terminalStatus) return 'done';
+    if (status === initialStatus) return 'not_started';
+    return 'in_progress';
+  }
+  function statusLabel(status) {
+    return status.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+  }
+
+  theadRow.innerHTML = `<th>Title</th>${board.fields.map(f => `<th>${escapeHtml(f.label)}</th>`).join('')}<th>Status</th><th>Assigned to</th><th></th>`;
+  formFieldsEl.innerHTML = `
+    <input type="text" name="title" placeholder="Title" required class="flex-1 min-w-[160px]">
+    ${board.fields.map(f => `<input type="text" name="field:${f.key}" placeholder="${escapeHtml(f.label)}" class="flex-1 min-w-[160px]">`).join('')}
+  `;
+  submitBtn.textContent = `Log ${board.itemLabel}`;
+
+  async function refresh() {
+    const items = await api(`/api/boards/${board.id}/items`);
+    emptyEl.style.display = items.length ? 'none' : 'block';
+    tbody.innerHTML = items.map(item => {
+      const isMine = item.assignedTo === me.id;
+      const canClaim = !item.assignedTo && item.status !== terminalStatus;
+      const canManage = (isMine || isAdmin) && item.status !== terminalStatus;
+      const currentIdx = board.statuses.indexOf(item.status);
+
+      let actions = '';
+      if (canClaim) actions += `<button class="small whitespace-nowrap" data-action="claim" data-id="${item.id}">Claim</button> `;
+      if (canManage) {
+        board.statuses.slice(currentIdx + 1).forEach(s => {
+          actions += `<button class="small primary whitespace-nowrap" data-action="status" data-status="${s}" data-id="${item.id}">Mark ${escapeHtml(statusLabel(s))}</button> `;
+        });
+      }
+      if (isMine && item.status !== terminalStatus) actions += `<button class="small whitespace-nowrap" data-action="unclaim" data-id="${item.id}">Give back</button> `;
+      if (isAdmin) actions += `<button class="small whitespace-nowrap" data-action="delete" data-id="${item.id}">Delete</button>`;
+
+      return `<tr class="status-${item.status}">
+        <td>${escapeHtml(item.title)}</td>
+        ${board.fields.map(f => `<td class="muted">${escapeHtml(item.fields[f.key] || '—')}</td>`).join('')}
+        <td><span class="badge ${statusBadgeClass(item.status)}"><span class="dot"></span>${escapeHtml(statusLabel(item.status))}</span></td>
+        <td class="muted">${item.assignedToName ? escapeHtml(item.assignedToName) : '—'}</td>
+        <td class="flex flex-wrap gap-1">${actions}</td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => handleAction(btn.dataset.action, Number(btn.dataset.id), btn.dataset.status));
+    });
+  }
+
+  async function handleAction(action, id, status) {
+    try {
+      if (action === 'claim') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ claim: true }) });
+      if (action === 'unclaim') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ unclaim: true }) });
+      if (action === 'status') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      if (action === 'delete') {
+        if (!confirm(`Delete this ${board.itemLabel}? This cannot be undone.`)) return;
+        await api(`/api/boards/${board.id}/items/${id}`, { method: 'DELETE' });
+      }
+      await refresh();
+      if (onChange) onChange();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const fields = {};
+    board.fields.forEach(f => { fields[f.key] = data.get(`field:${f.key}`) || ''; });
+    try {
+      await api(`/api/boards/${board.id}/items`, {
+        method: 'POST',
+        body: JSON.stringify({ title: data.get('title'), fields })
+      });
+      form.reset();
+      await refresh();
+      if (onChange) onChange();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  refresh();
+  return { refresh };
+}
+
 // A small color swatch for a course's category, if a brand color is set for it.
 function categorySwatch(category, programColors) {
   const color = programColors && programColors[category];
