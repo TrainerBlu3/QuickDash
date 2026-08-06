@@ -161,6 +161,18 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
     </select>`;
   }
 
+  // Admins can set any status in either direction, including rolling a
+  // terminal-status item (e.g. Resolved) back — the forward-only "Mark X"
+  // buttons below are a self-service shortcut for regular members and
+  // intentionally disappear once an item is terminal, but that shouldn't
+  // strand admins with no way back. Mirrors the full status <select>
+  // Admin > Courses already has for the same reason.
+  function statusSelect(item) {
+    return `<select class="small" data-status-select="${item.id}">
+      ${board.statuses.map(s => `<option value="${s}"${s === item.status ? ' selected' : ''}>${escapeHtml(statusLabel(s))}</option>`).join('')}
+    </select>`;
+  }
+
   async function refresh() {
     const [items, users] = await Promise.all([
       api(`/api/boards/${board.id}/items`),
@@ -174,7 +186,7 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
 
       const isMine = item.assignedTo === me.id;
       const canClaim = !item.assignedTo && item.status !== terminalStatus;
-      const canManage = (isMine || isAdmin) && item.status !== terminalStatus;
+      const canManage = isMine && !isAdmin && item.status !== terminalStatus;
       const currentIdx = board.statuses.indexOf(item.status);
 
       let actions = '';
@@ -184,8 +196,9 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
           actions += `<button class="small primary whitespace-nowrap" data-action="status" data-status="${s}" data-id="${item.id}">Mark ${escapeHtml(statusLabel(s))}</button> `;
         });
       }
-      if (isMine && item.status !== terminalStatus) actions += `<button class="small whitespace-nowrap" data-action="unclaim" data-id="${item.id}">Give back</button> `;
+      if (isMine && !isAdmin && item.status !== terminalStatus) actions += `<button class="small whitespace-nowrap" data-action="unclaim" data-id="${item.id}">Give back</button> `;
       if (isAdmin) {
+        actions += `${statusSelect(item)} `;
         actions += `${assignSelect(item)} <button class="small whitespace-nowrap" data-action="force-assign" data-id="${item.id}">Assign</button> `;
         if (item.assignedTo) actions += `<button class="small whitespace-nowrap" data-action="unassign" data-id="${item.id}">Unassign</button> `;
         actions += `<button class="small whitespace-nowrap" data-action="edit" data-id="${item.id}">Edit</button> `;
@@ -203,6 +216,9 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
 
     tbody.querySelectorAll('button[data-action]').forEach(btn => {
       btn.addEventListener('click', () => handleAction(btn.dataset.action, Number(btn.dataset.id), btn.dataset.status));
+    });
+    tbody.querySelectorAll('select[data-status-select]').forEach(sel => {
+      sel.addEventListener('change', () => handleAction('status', Number(sel.dataset.statusSelect), sel.value));
     });
   }
 
