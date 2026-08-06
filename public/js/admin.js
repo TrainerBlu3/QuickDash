@@ -472,16 +472,17 @@ document.getElementById('issues-filter-status').addEventListener('change', loadI
 
 // ---- Boards ----
 
-// Membership management for generic boards (e.g. Tickets). The legacy
-// Courses board descriptor (itemLabel 'course') is excluded — its
-// membership is grandfathered and unused by any route, so there's nothing
-// meaningful to manage for it here.
+// Membership management for every board, including the legacy Courses
+// board — removing a user from it here hides the Courses tab/data for
+// them on the dashboard (see loadBoards() in app.js), without touching
+// /api/courses itself, which stays open to any logged-in user regardless
+// (admins always see every board no matter their own membership rows).
 async function loadBoardsAdmin() {
-  const allBoards = (await api('/api/boards')).filter(b => b.itemLabel !== 'course');
+  const allBoards = await api('/api/boards');
   const container = document.getElementById('boards-list');
 
   if (!allBoards.length) {
-    container.innerHTML = '<p class="muted small">No boards yet besides Courses.</p>';
+    container.innerHTML = '<p class="muted small">No boards yet.</p>';
     return;
   }
 

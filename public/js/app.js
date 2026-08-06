@@ -9,24 +9,47 @@ let boards = [];
 let currentBoardId = 'courses'; // 'courses' or a board.id
 const boardViews = {}; // board.id -> { refresh() }, lazily initialized
 
-// Coursework stays a first-class tab alongside any board the user belongs
-// to. The switcher only shows once there's an actual choice to make (a
-// solo Courses-only user sees no change at all from before this feature).
+// The Courses tab is gated on real membership of the legacy "Courses"
+// board (itemLabel 'course'), same as any other board — GET /api/boards
+// only returns boards this user is a member of (or all of them, for an
+// admin), so its presence/absence in the response is the membership
+// check. An admin removing everyone from Courses' boardMembers (via the
+// Boards admin tab) hides the tab and its data for those users, without
+// touching /api/courses itself — admins keep full access regardless.
 async function loadBoards() {
-  // GET /api/boards also returns the legacy "Courses" board descriptor
-  // (itemLabel 'course') since it's grandfathered membership for every
-  // user — filter it out here since the Courses tab below is hardcoded
-  // and still backed by /api/courses, not the generic items endpoint.
-  boards = (await api('/api/boards')).filter(b => b.itemLabel !== 'course');
-  const tabsEl = document.getElementById('board-tabs');
-  if (boards.length < 1) { tabsEl.style.display = 'none'; return; }
+  const allBoards = await api('/api/boards');
+  const isCoursesMember = allBoards.some(b => b.itemLabel === 'course');
+  boards = allBoards.filter(b => b.itemLabel !== 'course');
 
-  tabsEl.style.display = 'flex';
-  const tabs = [{ id: 'courses', name: 'Courses' }, ...boards.map(b => ({ id: b.id, name: b.name }))];
+  const tabsEl = document.getElementById('board-tabs');
+  const tabs = [
+    ...(isCoursesMember ? [{ id: 'courses', name: 'Courses' }] : []),
+    ...boards.map(b => ({ id: b.id, name: b.name }))
+  ];
+
+  if (!tabs.length) {
+    tabsEl.style.display = 'none';
+    document.getElementById('board-courses').style.display = 'none';
+    document.getElementById('board-generic').style.display = 'none';
+    document.getElementById('board-none').style.display = 'block';
+    return;
+  }
+  document.getElementById('board-none').style.display = 'none';
+
+  // If the current view is no longer available to this user (e.g. their
+  // Courses access was just revoked while they were on that tab), fall
+  // back to the first tab they do have.
+  if (!tabs.some(t => String(t.id) === String(currentBoardId))) {
+    currentBoardId = tabs[0].id;
+  }
+
+  tabsEl.style.display = tabs.length > 1 ? 'flex' : 'none';
   tabsEl.innerHTML = tabs.map(t => `<button data-board="${t.id}" class="${String(t.id) === String(currentBoardId) ? 'active' : ''}">${escapeHtml(t.name)}</button>`).join('');
   tabsEl.querySelectorAll('button[data-board]').forEach(btn => {
     btn.addEventListener('click', () => switchBoard(btn.dataset.board === 'courses' ? 'courses' : Number(btn.dataset.board)));
   });
+
+  switchBoard(currentBoardId);
 }
 
 function switchBoard(boardId) {
@@ -230,11 +253,16 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
 (async function init() {
   await loadMe();
   issuesDialog = initIssuesDialog({ isAdmin: me.role === 'admin', onChange: loadCourses });
-  await loadProgramColors();
-  await loadUsersList();
-  await loadCourses();
-  await loadLog();
+  // Decide board visibility (and switch to the right default tab) before
+  // loading any course data, so a user without Courses access never sees
+  // a flash of course content before it's hidden.
   await loadBoards();
+  if (document.getElementById('board-courses').style.display !== 'none') {
+    await loadProgramColors();
+    await loadUsersList();
+    await loadCourses();
+  }
+  await loadLog();
   subscribeToUpdates((scopes) => {
     if (scopes.includes('courses')) loadCourses();
     if (scopes.includes('activity')) loadLog();
