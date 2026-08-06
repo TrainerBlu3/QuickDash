@@ -119,7 +119,8 @@ th[data-sort]:hover { color: var(--text-primary); }
 .sort-arrow { display: inline-block; width: 10px; margin-left: 2px; }
 tbody tr:hover { background: var(--page-plane); }
 tbody tr.has-issue, tbody tr.has-issue:hover { background: var(--status-critical-bg); }
-tbody tr.status-claimed, tbody tr.status-claimed:hover { background: var(--status-warning-bg); }
+tbody tr.board-claimed-tint, tbody tr.board-claimed-tint:hover { background: var(--status-warning-bg); }
+tbody tr.board-terminal-tint, tbody tr.board-terminal-tint:hover { background: var(--status-good-bg); }
 
 .badge {
   display: inline-flex;

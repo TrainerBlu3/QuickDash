@@ -117,6 +117,10 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
 
   const initialStatus = board.statuses[0];
   const terminalStatus = board.statuses[board.statuses.length - 1];
+  const trailingCols = 2 + board.fields.length; // fields + status + assigned to, for the edit row's colspan
+
+  let allUsers = [];
+  let editingId = null; // item.id currently shown as an inline edit row, or null
 
   function statusBadgeClass(status) {
     if (status === terminalStatus) return 'done';
@@ -126,6 +130,11 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   function statusLabel(status) {
     return status.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
   }
+  function rowTintClass(status) {
+    if (status === terminalStatus) return 'board-terminal-tint';
+    if (board.claimTargetStatus && status === board.claimTargetStatus) return 'board-claimed-tint';
+    return '';
+  }
 
   theadRow.innerHTML = `<th>Title</th>${board.fields.map(f => `<th>${escapeHtml(f.label)}</th>`).join('')}<th>Status</th><th>Assigned to</th><th></th>`;
   formFieldsEl.innerHTML = `
@@ -134,10 +143,35 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   `;
   submitBtn.textContent = `Log ${board.itemLabel}`;
 
+  function editRow(item) {
+    return `<tr data-editing="${item.id}">
+      <td><input type="text" class="edit-title" value="${escapeHtml(item.title)}"></td>
+      ${board.fields.map(f => `<td><input type="text" class="edit-field" data-key="${f.key}" value="${escapeHtml(item.fields[f.key] || '')}"></td>`).join('')}
+      <td colspan="${trailingCols}" class="flex flex-wrap gap-1">
+        <button class="small primary whitespace-nowrap" data-action="save-edit" data-id="${item.id}">Save</button>
+        <button class="small whitespace-nowrap" data-action="cancel-edit" data-id="${item.id}">Cancel</button>
+      </td>
+    </tr>`;
+  }
+
+  function assignSelect(item) {
+    return `<select class="small" data-assign-select="${item.id}">
+      <option value="">Assign to…</option>
+      ${allUsers.map(u => `<option value="${u.id}"${u.id === item.assignedTo ? ' selected' : ''}>${escapeHtml(u.name)}</option>`).join('')}
+    </select>`;
+  }
+
   async function refresh() {
-    const items = await api(`/api/boards/${board.id}/items`);
+    const [items, users] = await Promise.all([
+      api(`/api/boards/${board.id}/items`),
+      isAdmin ? api('/api/users/list') : Promise.resolve([])
+    ]);
+    if (isAdmin) allUsers = users;
+
     emptyEl.style.display = items.length ? 'none' : 'block';
     tbody.innerHTML = items.map(item => {
+      if (editingId === item.id) return editRow(item);
+
       const isMine = item.assignedTo === me.id;
       const canClaim = !item.assignedTo && item.status !== terminalStatus;
       const canManage = (isMine || isAdmin) && item.status !== terminalStatus;
@@ -151,9 +185,14 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
         });
       }
       if (isMine && item.status !== terminalStatus) actions += `<button class="small whitespace-nowrap" data-action="unclaim" data-id="${item.id}">Give back</button> `;
-      if (isAdmin) actions += `<button class="small whitespace-nowrap" data-action="delete" data-id="${item.id}">Delete</button>`;
+      if (isAdmin) {
+        actions += `${assignSelect(item)} <button class="small whitespace-nowrap" data-action="force-assign" data-id="${item.id}">Assign</button> `;
+        if (item.assignedTo) actions += `<button class="small whitespace-nowrap" data-action="unassign" data-id="${item.id}">Unassign</button> `;
+        actions += `<button class="small whitespace-nowrap" data-action="edit" data-id="${item.id}">Edit</button> `;
+        actions += `<button class="small whitespace-nowrap" data-action="delete" data-id="${item.id}">Delete</button>`;
+      }
 
-      return `<tr class="status-${item.status}">
+      return `<tr class="${rowTintClass(item.status)}">
         <td>${escapeHtml(item.title)}</td>
         ${board.fields.map(f => `<td class="muted">${escapeHtml(item.fields[f.key] || '—')}</td>`).join('')}
         <td><span class="badge ${statusBadgeClass(item.status)}"><span class="dot"></span>${escapeHtml(statusLabel(item.status))}</span></td>
@@ -168,9 +207,42 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   }
 
   async function handleAction(action, id, status) {
+    if (action === 'edit') { editingId = id; return refresh(); }
+    if (action === 'cancel-edit') { editingId = null; return refresh(); }
+
+    if (action === 'save-edit') {
+      const row = tbody.querySelector(`tr[data-editing="${id}"]`);
+      const title = row.querySelector('.edit-title').value;
+      const fields = {};
+      row.querySelectorAll('.edit-field').forEach(input => { fields[input.dataset.key] = input.value; });
+      try {
+        await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ title, fields }) });
+        editingId = null;
+        await refresh();
+        if (onChange) onChange();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
+    if (action === 'force-assign') {
+      const select = tbody.querySelector(`select[data-assign-select="${id}"]`);
+      if (!select.value) return;
+      try {
+        await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ assignTo: Number(select.value) }) });
+        await refresh();
+        if (onChange) onChange();
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+
     try {
       if (action === 'claim') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ claim: true }) });
       if (action === 'unclaim') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ unclaim: true }) });
+      if (action === 'unassign') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ assignTo: null }) });
       if (action === 'status') await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
       if (action === 'delete') {
         if (!confirm(`Delete this ${board.itemLabel}? This cannot be undone.`)) return;

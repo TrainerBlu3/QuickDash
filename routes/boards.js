@@ -162,12 +162,34 @@ router.patch('/:boardId/items/:itemId', requireAuth, requireBoardMember, (req, r
   const terminalStatus = statuses[statuses.length - 1];
   const initialStatus = statuses[0];
 
-  const { status, claim, unclaim, notes, assignTo } = req.body || {};
+  const { status, claim, unclaim, notes, assignTo, title, fields } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
   const isAdmin = req.session.role === 'admin';
   const isOwner = item.assignedTo === req.session.userId;
+
+  if (typeof title === 'string' || (fields && typeof fields === 'object')) {
+    if (!isAdmin) return res.status(403).json({ error: 'Only admins can edit this ' + board.itemLabel });
+    if (typeof title === 'string') {
+      if (!title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
+      patch.title = title.trim();
+    }
+    if (fields && typeof fields === 'object') {
+      const nextFields = { ...item.fields };
+      board.fields.forEach(f => {
+        if (Object.prototype.hasOwnProperty.call(fields, f.key)) {
+          nextFields[f.key] = fields[f.key] == null ? '' : String(fields[f.key]).trim();
+        }
+      });
+      patch.fields = nextFields;
+    }
+    logActivity({
+      userId: currentUser.id, username: currentUser.name,
+      boardId: board.id, itemId: item.id, itemTitle: patch.title || item.title,
+      action: 'edited'
+    });
+  }
 
   if (typeof assignTo !== 'undefined') {
     if (!isAdmin) return res.status(403).json({ error: 'Only admins can assign items to a user' });
