@@ -400,7 +400,7 @@ router.patch('/:id', requireAuth, requireCoursesAccess, (req, res) => {
   const course = db.get('courses').find({ id: Number(req.params.id) }).value();
   if (!course) return res.status(404).json({ error: 'Course not found' });
 
-  const { status, claim, unclaim, notes, priority, assignTo, category } = req.body || {};
+  const { status, claim, unclaim, notes, priority, assignTo, category, title, crn } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
@@ -416,6 +416,18 @@ router.patch('/:id', requireAuth, requireCoursesAccess, (req, res) => {
   if (typeof category === 'string') {
     if (!isAdmin) return res.status(403).json({ error: 'Only admins can change category' });
     patch.category = category.trim();
+  }
+
+  if (typeof title === 'string') {
+    if (!isAdmin) return res.status(403).json({ error: 'Only admins can change course title' });
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return res.status(400).json({ error: 'Course title is required' });
+    patch.title = trimmedTitle;
+  }
+
+  if (typeof crn === 'string') {
+    if (!isAdmin) return res.status(403).json({ error: 'Only admins can change CRN' });
+    patch.crn = crn.trim();
   }
 
   // Admin directly assigning (or unassigning) a course to/from a specific
