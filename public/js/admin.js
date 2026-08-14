@@ -143,6 +143,23 @@ let knownCategories = [];
 // render pass — only "Clear selection" or a bulk action resets it.
 let selectedCourseIds = new Set();
 
+// The course currently shown as an inline edit row (title/CRN/category), or
+// null. Only one row edits at a time, mirroring initBoardView's editingId.
+let editingCourseId = null;
+
+function courseEditRow(c) {
+  return `<tr data-editing-course="${c.id}">
+    <td></td>
+    <td><input type="text" class="edit-course-title" value="${escapeHtml(c.title)}"></td>
+    <td><input type="text" class="edit-course-crn" value="${escapeHtml(c.crn || '')}"></td>
+    <td><input type="text" class="edit-course-category" value="${escapeHtml(c.category || '')}" list="pc-category-options"></td>
+    <td colspan="3">
+      <button class="small primary" data-action="save-course-edit" data-id="${c.id}">Save</button>
+      <button class="small" data-action="cancel-course-edit" data-id="${c.id}">Cancel</button>
+    </td>
+  </tr>`;
+}
+
 function updateBulkBar() {
   const bar = document.getElementById('bulk-actions');
   if (selectedCourseIds.size === 0) {
@@ -176,7 +193,9 @@ async function loadAdminCourses() {
   courses = columnSort.sortCourses(courses);
 
   const tbody = document.getElementById('admin-course-rows');
-  tbody.innerHTML = courses.map(c => `
+  tbody.innerHTML = courses.map(c => {
+    if (editingCourseId === c.id) return courseEditRow(c);
+    return `
     <tr${openIssueCounts[c.id] ? ' class="has-issue"' : ''}>
       <td><input type="checkbox" class="course-select" data-id="${c.id}" ${selectedCourseIds.has(c.id) ? 'checked' : ''}></td>
       <td>${escapeHtml(c.title)}</td>
@@ -196,13 +215,43 @@ async function loadAdminCourses() {
         </select>
       </td>
       <td>
+        <button class="small" data-id="${c.id}" data-action="edit-course">Edit</button>
         <button class="small" data-id="${c.id}" data-action="toggle-priority">${c.priority ? 'Unmark priority' : 'Mark priority'}</button>
         <button class="small" data-id="${c.id}" data-action="issues">⚠ Issues</button>
         <button class="small" data-id="${c.id}" data-action="delete">Delete</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
   updateBulkBar();
+  tbody.querySelectorAll('button[data-action="edit-course"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editingCourseId = Number(btn.dataset.id);
+      loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('button[data-action="cancel-course-edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editingCourseId = null;
+      loadAdminCourses();
+    });
+  });
+  tbody.querySelectorAll('button[data-action="save-course-edit"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = tbody.querySelector(`tr[data-editing-course="${btn.dataset.id}"]`);
+      const title = row.querySelector('.edit-course-title').value.trim();
+      const crn = row.querySelector('.edit-course-crn').value.trim();
+      const category = row.querySelector('.edit-course-category').value.trim();
+      if (!title) { alert('Course title is required.'); return; }
+      try {
+        await api(`/api/courses/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ title, crn, category }) });
+        editingCourseId = null;
+        await loadAdminCourses();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
   tbody.querySelectorAll('button[data-action="issues"]').forEach(btn => {
     btn.addEventListener('click', () => issuesDialog.open(allCourses.find(c => c.id === Number(btn.dataset.id))));
   });
