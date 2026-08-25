@@ -16,6 +16,17 @@ function publicBoard(b) {
   };
 }
 
+// Admin-supplied dates arrive as a bare "YYYY-MM-DD" from <input type="date">.
+// Anchoring at UTC noon (not midnight) keeps the calendar day intact once the
+// client renders it back in local time.
+// ponytail: assumes the browser's UTC offset is within +/-12h, true for any
+// realistic deployment of this app; extend if a Kiribati-based TA joins.
+function parseDayInput(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return null;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return isNaN(parsed) ? null : parsed.toISOString();
+}
+
 function logActivity({ userId, username, boardId, itemId, itemTitle, action, fromStatus, toStatus, notes }) {
   db.get('activity').push({
     id: nextId('activity'),
@@ -186,17 +197,17 @@ router.patch('/:boardId/items/:itemId', requireAuth, requireBoardMember, (req, r
       patch.fields = nextFields;
     }
     if (typeof createdAt !== 'undefined') {
-      const parsed = new Date(createdAt);
-      if (!createdAt || isNaN(parsed)) return res.status(400).json({ error: 'Invalid logged date' });
-      patch.createdAt = parsed.toISOString();
+      const parsed = parseDayInput(createdAt);
+      if (!createdAt || !parsed) return res.status(400).json({ error: 'Invalid logged date' });
+      patch.createdAt = parsed;
     }
     if (typeof completedAt !== 'undefined') {
       if (!completedAt) {
         patch.completedAt = null;
       } else {
-        const parsed = new Date(completedAt);
-        if (isNaN(parsed)) return res.status(400).json({ error: 'Invalid finished date' });
-        patch.completedAt = parsed.toISOString();
+        const parsed = parseDayInput(completedAt);
+        if (!parsed) return res.status(400).json({ error: 'Invalid finished date' });
+        patch.completedAt = parsed;
       }
     }
     logActivity({

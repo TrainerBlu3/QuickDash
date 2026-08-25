@@ -78,7 +78,9 @@ function switchBoard(boardId) {
         formFields: 'board-generic-form-fields',
         submitBtn: 'board-generic-submit',
         dateFilter: 'board-generic-date-filter',
-        dateClear: 'board-generic-date-clear'
+        dateClear: 'board-generic-date-clear',
+        total: 'board-generic-total',
+        dailyRows: 'board-generic-daily-rows'
       },
       onChange: loadLog
     });

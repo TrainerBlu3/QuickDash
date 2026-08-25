@@ -116,6 +116,8 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   const submitBtn = document.getElementById(containerIds.submitBtn);
   const dateFilterEl = document.getElementById(containerIds.dateFilter);
   const dateClearEl = document.getElementById(containerIds.dateClear);
+  const totalEl = document.getElementById(containerIds.total);
+  const dailyRowsEl = document.getElementById(containerIds.dailyRows);
 
   const initialStatus = board.statuses[0];
   const terminalStatus = board.statuses[board.statuses.length - 1];
@@ -193,12 +195,49 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  // Counts logged/finished per day across every item (not just the
+  // day-filtered view), newest day first, so the summary is a stable
+  // reference point no matter what the table below is currently filtered to.
+  function renderDailySummary(allItems) {
+    if (!totalEl || !dailyRowsEl) return;
+    totalEl.textContent = `Total ${board.itemLabel}s: ${allItems.length}`;
+
+    const counts = {}; // day -> { logged, finished }
+    const bump = (day, key) => {
+      if (!day) return;
+      if (!counts[day]) counts[day] = { logged: 0, finished: 0 };
+      counts[day][key]++;
+    };
+    allItems.forEach(item => {
+      bump(isoDay(item.createdAt), 'logged');
+      bump(isoDay(item.completedAt), 'finished');
+    });
+
+    const days = Object.keys(counts).sort().reverse();
+    dailyRowsEl.innerHTML = days.length
+      ? days.map(day => `<tr class="board-day-row" data-day="${day}">
+          <td>${day}</td><td>${counts[day].logged}</td><td>${counts[day].finished}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="3" class="muted small">No ${board.itemLabel}s logged yet.</td></tr>`;
+
+    dailyRowsEl.querySelectorAll('tr[data-day]').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        if (!dateFilterEl) return;
+        dateFilterEl.value = dateFilterEl.value === row.dataset.day ? '' : row.dataset.day;
+        refresh();
+      });
+    });
+  }
+
   async function refresh() {
     const [allItems, users] = await Promise.all([
       api(`/api/boards/${board.id}/items`),
       isAdmin ? api('/api/users/list') : Promise.resolve([])
     ]);
     if (isAdmin) allUsers = users;
+
+    renderDailySummary(allItems);
 
     const day = dateFilterEl && dateFilterEl.value;
     const items = day
