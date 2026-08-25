@@ -141,7 +141,8 @@ router.post('/:boardId/items', requireAuth, requireBoardMember, (req, res) => {
     assignedToName: null,
     notes: notes || '',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    completedAt: null
   };
   db.get('items').push(item).write();
   logActivity({
@@ -162,14 +163,14 @@ router.patch('/:boardId/items/:itemId', requireAuth, requireBoardMember, (req, r
   const terminalStatus = statuses[statuses.length - 1];
   const initialStatus = statuses[0];
 
-  const { status, claim, unclaim, notes, assignTo, title, fields } = req.body || {};
+  const { status, claim, unclaim, notes, assignTo, title, fields, createdAt, completedAt } = req.body || {};
   const patch = { updatedAt: new Date().toISOString() };
   const currentUser = db.get('users').find({ id: req.session.userId }).value();
 
   const isAdmin = req.session.role === 'admin';
   const isOwner = item.assignedTo === req.session.userId;
 
-  if (typeof title === 'string' || (fields && typeof fields === 'object')) {
+  if (typeof title === 'string' || (fields && typeof fields === 'object') || typeof createdAt !== 'undefined' || typeof completedAt !== 'undefined') {
     if (!isAdmin) return res.status(403).json({ error: 'Only admins can edit this ' + board.itemLabel });
     if (typeof title === 'string') {
       if (!title.trim()) return res.status(400).json({ error: 'Title cannot be empty' });
@@ -183,6 +184,20 @@ router.patch('/:boardId/items/:itemId', requireAuth, requireBoardMember, (req, r
         }
       });
       patch.fields = nextFields;
+    }
+    if (typeof createdAt !== 'undefined') {
+      const parsed = new Date(createdAt);
+      if (!createdAt || isNaN(parsed)) return res.status(400).json({ error: 'Invalid logged date' });
+      patch.createdAt = parsed.toISOString();
+    }
+    if (typeof completedAt !== 'undefined') {
+      if (!completedAt) {
+        patch.completedAt = null;
+      } else {
+        const parsed = new Date(completedAt);
+        if (isNaN(parsed)) return res.status(400).json({ error: 'Invalid finished date' });
+        patch.completedAt = parsed.toISOString();
+      }
     }
     logActivity({
       userId: currentUser.id, username: currentUser.name,
@@ -277,6 +292,7 @@ router.patch('/:boardId/items/:itemId', requireAuth, requireBoardMember, (req, r
       });
     }
     patch.status = status;
+    patch.completedAt = status === terminalStatus ? new Date().toISOString() : null;
   }
 
   if (typeof notes === 'string' && !status) {

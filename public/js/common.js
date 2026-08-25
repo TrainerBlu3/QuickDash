@@ -114,10 +114,11 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   const form = document.getElementById(containerIds.form);
   const formFieldsEl = document.getElementById(containerIds.formFields);
   const submitBtn = document.getElementById(containerIds.submitBtn);
+  const dateFilterEl = document.getElementById(containerIds.dateFilter);
+  const dateClearEl = document.getElementById(containerIds.dateClear);
 
   const initialStatus = board.statuses[0];
   const terminalStatus = board.statuses[board.statuses.length - 1];
-  const trailingCols = 2 + board.fields.length; // fields + status + assigned to, for the edit row's colspan
 
   let allUsers = [];
   let editingId = null; // item.id currently shown as an inline edit row, or null
@@ -136,18 +137,25 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
     return '';
   }
 
-  theadRow.innerHTML = `<th>Title</th>${board.fields.map(f => `<th>${escapeHtml(f.label)}</th>`).join('')}<th>Status</th><th>Assigned to</th><th></th>`;
+  theadRow.innerHTML = `<th>Title</th>${board.fields.map(f => `<th>${escapeHtml(f.label)}</th>`).join('')}<th>Status</th><th>Assigned to</th><th>Logged</th><th>Finished</th><th></th>`;
   formFieldsEl.innerHTML = `
     <input type="text" name="title" placeholder="Title" required class="flex-1 min-w-[160px]">
     ${board.fields.map(f => `<input type="text" name="field:${f.key}" placeholder="${escapeHtml(f.label)}" class="flex-1 min-w-[160px]">`).join('')}
   `;
   submitBtn.textContent = `Log ${board.itemLabel}`;
 
+  // Native <input type="date"> wants a local YYYY-MM-DD, not the ISO
+  // string's UTC date — reuses isoDay() so the edit box shows the same day
+  // the read-only column just displayed.
   function editRow(item) {
     return `<tr data-editing="${item.id}">
       <td><input type="text" class="edit-title" value="${escapeHtml(item.title)}"></td>
       ${board.fields.map(f => `<td><input type="text" class="edit-field" data-key="${f.key}" value="${escapeHtml(item.fields[f.key] || '')}"></td>`).join('')}
-      <td colspan="${trailingCols}" class="flex flex-wrap gap-1">
+      <td></td>
+      <td></td>
+      <td><input type="date" class="edit-created" value="${isoDay(item.createdAt) || ''}"></td>
+      <td><input type="date" class="edit-completed" value="${isoDay(item.completedAt) || ''}"></td>
+      <td class="flex flex-wrap gap-1">
         <button class="small primary whitespace-nowrap" data-action="save-edit" data-id="${item.id}">Save</button>
         <button class="small whitespace-nowrap" data-action="cancel-edit" data-id="${item.id}">Cancel</button>
       </td>
@@ -173,14 +181,32 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
     </select>`;
   }
 
+  function fmtDay(iso) {
+    return iso ? new Date(iso).toLocaleDateString() : '—';
+  }
+
+  // Local YYYY-MM-DD, matching what <input type="date"> gives us — using
+  // toISOString() here would shift the day at UTC boundaries.
+  function isoDay(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   async function refresh() {
-    const [items, users] = await Promise.all([
+    const [allItems, users] = await Promise.all([
       api(`/api/boards/${board.id}/items`),
       isAdmin ? api('/api/users/list') : Promise.resolve([])
     ]);
     if (isAdmin) allUsers = users;
 
+    const day = dateFilterEl && dateFilterEl.value;
+    const items = day
+      ? allItems.filter(item => isoDay(item.createdAt) === day || isoDay(item.completedAt) === day)
+      : allItems;
+
     emptyEl.style.display = items.length ? 'none' : 'block';
+    emptyEl.textContent = day && allItems.length ? `Nothing logged or finished on ${day}.` : 'Nothing here yet.';
     tbody.innerHTML = items.map(item => {
       if (editingId === item.id) return editRow(item);
 
@@ -210,6 +236,8 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
         ${board.fields.map(f => `<td class="muted">${escapeHtml(item.fields[f.key] || '—')}</td>`).join('')}
         <td><span class="badge ${statusBadgeClass(item.status)}"><span class="dot"></span>${escapeHtml(statusLabel(item.status))}</span></td>
         <td class="muted">${item.assignedToName ? escapeHtml(item.assignedToName) : '—'}</td>
+        <td class="muted">${fmtDay(item.createdAt)}</td>
+        <td class="muted">${fmtDay(item.completedAt)}</td>
         <td class="flex flex-wrap gap-1">${actions}</td>
       </tr>`;
     }).join('');
@@ -231,8 +259,10 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
       const title = row.querySelector('.edit-title').value;
       const fields = {};
       row.querySelectorAll('.edit-field').forEach(input => { fields[input.dataset.key] = input.value; });
+      const createdAt = row.querySelector('.edit-created').value;
+      const completedAt = row.querySelector('.edit-completed').value;
       try {
-        await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ title, fields }) });
+        await api(`/api/boards/${board.id}/items/${id}`, { method: 'PATCH', body: JSON.stringify({ title, fields, createdAt, completedAt }) });
         editingId = null;
         await refresh();
         if (onChange) onChange();
@@ -288,6 +318,9 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
       alert(err.message);
     }
   });
+
+  if (dateFilterEl) dateFilterEl.addEventListener('change', refresh);
+  if (dateClearEl) dateClearEl.addEventListener('click', () => { dateFilterEl.value = ''; refresh(); });
 
   refresh();
   return { refresh };
