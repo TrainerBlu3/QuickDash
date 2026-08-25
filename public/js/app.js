@@ -80,7 +80,7 @@ function switchBoard(boardId) {
         dateFilter: 'board-generic-date-filter',
         dateClear: 'board-generic-date-clear',
         total: 'board-generic-total',
-        dailyRows: 'board-generic-daily-rows'
+        dayStats: 'board-generic-day-stats'
       },
       onChange: loadLog
     });

@@ -93,16 +93,11 @@ tailwind.config = { corePlugins: { preflight: false } };
         <button type="submit" class="primary whitespace-nowrap" id="board-generic-submit">Log item</button>
       </form>
       <p class="small" id="board-generic-total"></p>
-      <div class="overflow-x-auto mb-4">
-        <table>
-          <thead><tr><th>Day</th><th>Logged</th><th>Finished</th></tr></thead>
-          <tbody id="board-generic-daily-rows"></tbody>
-        </table>
-      </div>
-      <div class="flex flex-wrap items-center gap-2 mb-2">
-        <label for="board-generic-date-filter" class="small muted">Show day:</label>
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <label for="board-generic-date-filter" class="small muted">Stats for day:</label>
         <input type="date" id="board-generic-date-filter">
         <button type="button" class="small" id="board-generic-date-clear">Clear</button>
+        <span class="small muted" id="board-generic-day-stats"></span>
       </div>
       <div class="overflow-x-auto">
         <table>

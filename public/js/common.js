@@ -117,7 +117,7 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   const dateFilterEl = document.getElementById(containerIds.dateFilter);
   const dateClearEl = document.getElementById(containerIds.dateClear);
   const totalEl = document.getElementById(containerIds.total);
-  const dailyRowsEl = document.getElementById(containerIds.dailyRows);
+  const dayStatsEl = document.getElementById(containerIds.dayStats);
 
   const initialStatus = board.statuses[0];
   const terminalStatus = board.statuses[board.statuses.length - 1];
@@ -196,12 +196,9 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
   }
 
   // Counts logged/finished per day across every item (not just the
-  // day-filtered view), newest day first, so the summary is a stable
-  // reference point no matter what the table below is currently filtered to.
-  function renderDailySummary(allItems) {
-    if (!totalEl || !dailyRowsEl) return;
-    totalEl.textContent = `Total ${board.itemLabel}s: ${allItems.length}`;
-
+  // day-filtered view), so the header/lookup stay accurate regardless of
+  // what the table below is currently filtered to.
+  function countsByDay(allItems) {
     const counts = {}; // day -> { logged, finished }
     const bump = (day, key) => {
       if (!day) return;
@@ -212,22 +209,22 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
       bump(isoDay(item.createdAt), 'logged');
       bump(isoDay(item.completedAt), 'finished');
     });
+    return counts;
+  }
 
-    const days = Object.keys(counts).sort().reverse();
-    dailyRowsEl.innerHTML = days.length
-      ? days.map(day => `<tr class="board-day-row" data-day="${day}">
-          <td>${day}</td><td>${counts[day].logged}</td><td>${counts[day].finished}</td>
-        </tr>`).join('')
-      : `<tr><td colspan="3" class="muted small">No ${board.itemLabel}s logged yet.</td></tr>`;
+  function renderStats(allItems) {
+    const counts = countsByDay(allItems);
+    const today = isoDay(new Date().toISOString());
+    const todayCounts = counts[today] || { logged: 0, finished: 0 };
 
-    dailyRowsEl.querySelectorAll('tr[data-day]').forEach(row => {
-      row.style.cursor = 'pointer';
-      row.addEventListener('click', () => {
-        if (!dateFilterEl) return;
-        dateFilterEl.value = dateFilterEl.value === row.dataset.day ? '' : row.dataset.day;
-        refresh();
-      });
-    });
+    if (totalEl) {
+      totalEl.textContent = `Total ${board.itemLabel}s: ${allItems.length} · Today: ${todayCounts.logged} logged, ${todayCounts.finished} finished`;
+    }
+    if (dayStatsEl) {
+      const day = dateFilterEl && dateFilterEl.value;
+      const dayCounts = day ? (counts[day] || { logged: 0, finished: 0 }) : null;
+      dayStatsEl.textContent = dayCounts ? `${day}: ${dayCounts.logged} logged, ${dayCounts.finished} finished` : '';
+    }
   }
 
   async function refresh() {
@@ -237,7 +234,7 @@ function initBoardView({ board, isAdmin, me, containerIds, onChange }) {
     ]);
     if (isAdmin) allUsers = users;
 
-    renderDailySummary(allItems);
+    renderStats(allItems);
 
     const day = dateFilterEl && dateFilterEl.value;
     const items = day
